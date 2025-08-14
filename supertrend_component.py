@@ -52,6 +52,11 @@ def get_trend_signals(df: pd.DataFrame) -> tuple:
     Returns:
     tuple: (buy_positions, sell_positions) - 买入和卖出信号的索引位置
     """
+    # 检查 trend 列是否存在
+    if 'trend' not in df.columns:
+        print("⚠️  get_trend_signals: 缺少 trend 列，返回空信号")
+        return pd.Index([]), pd.Index([])
+    
     # 计算趋势变化点
     df['trend_shifted'] = df['trend'].shift(1)
     b_positions = df[(df['trend'] == 1) & (df['trend_shifted'] != 1)].index

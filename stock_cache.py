@@ -68,12 +68,78 @@ class StockDataCache:
             )
         ''')
         
+        # 创建技术指标表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS technical_indicators (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                stock_name TEXT NOT NULL,
+                date TEXT NOT NULL,
+                rsi14 REAL,
+                ma10 REAL,
+                trend INTEGER DEFAULT 0,
+                upper_band REAL,
+                lower_band REAL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(symbol, date)
+            )
+        ''')
+        
+        # 创建RSI背离信号表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS rsi_divergences (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                stock_name TEXT NOT NULL,
+                date TEXT NOT NULL,
+                prev_date TEXT NOT NULL,
+                type TEXT NOT NULL,
+                timeframe TEXT NOT NULL,
+                rsi_change REAL NOT NULL,
+                price_change REAL NOT NULL,
+                confidence REAL NOT NULL,
+                current_rsi REAL NOT NULL,
+                prev_rsi REAL NOT NULL,
+                current_price REAL NOT NULL,
+                prev_price REAL NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # 创建趋势信号表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS trend_signals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                stock_name TEXT NOT NULL,
+                date TEXT NOT NULL,
+                signal_type TEXT NOT NULL,
+                price REAL NOT NULL,
+                trend_value REAL NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         # 创建索引提高查询性能
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_symbol_date ON stock_data(symbol, date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_stock_name ON stock_data(stock_name)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_updated_at ON stock_data(updated_at)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_stock_code ON stock_info(code)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_stock_info_name ON stock_info(name)')
+        
+        # 技术指标表索引
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_indicators_symbol_date ON technical_indicators(symbol, date)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_indicators_stock_name ON technical_indicators(stock_name)')
+        
+        # RSI背离表索引
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_divergences_symbol ON rsi_divergences(symbol)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_divergences_date ON rsi_divergences(date)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_divergences_confidence ON rsi_divergences(confidence)')
+        
+        # 趋势信号表索引
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_symbol_date ON trend_signals(symbol, date)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_type ON trend_signals(signal_type)')
         
         conn.commit()
         conn.close()
@@ -360,6 +426,217 @@ class StockDataCache:
         finally:
             conn.close()
 
+    def save_technical_indicators(self, symbol: str, stock_name: str, indicators_data: list):
+        """
+        保存技术指标数据到数据库
+        
+        Args:
+            symbol: 股票代码
+            stock_name: 股票名称
+            indicators_data: 技术指标数据列表
+        """
+        if not indicators_data:
+            return
+            
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # 准备数据
+        data_to_insert = []
+        for indicator in indicators_data:
+            data_to_insert.append((
+                symbol,
+                stock_name,
+                indicator.date,
+                indicator.rsi14,
+                indicator.ma10,
+                indicator.trend,
+                indicator.upper_band,
+                indicator.lower_band,
+                datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            ))
+        
+        # 使用REPLACE INTO处理重复数据
+        cursor.executemany('''
+            REPLACE INTO technical_indicators 
+            (symbol, stock_name, date, rsi14, ma10, trend, upper_band, lower_band, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', data_to_insert)
+        
+        conn.commit()
+        conn.close()
+        print(f"✅ 已保存 {len(data_to_insert)} 条技术指标数据")
+    
+    def save_rsi_divergences(self, symbol: str, stock_name: str, divergences_data: list):
+        """
+        保存RSI背离信号到数据库
+        
+        Args:
+            symbol: 股票代码
+            stock_name: 股票名称  
+            divergences_data: RSI背离数据列表
+        """
+        if not divergences_data:
+            return
+            
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # 先删除该股票的旧背离数据（避免重复）
+        cursor.execute('DELETE FROM rsi_divergences WHERE symbol = ?', (symbol,))
+        
+        # 准备数据
+        data_to_insert = []
+        for div in divergences_data:
+            data_to_insert.append((
+                symbol, stock_name, div.date, div.prev_date, div.type, div.timeframe,
+                div.rsi_change, div.price_change, div.confidence, div.current_rsi, div.prev_rsi,
+                div.current_price, div.prev_price, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            ))
+        
+        cursor.executemany('''
+            INSERT INTO rsi_divergences 
+            (symbol, stock_name, date, prev_date, type, timeframe, rsi_change, price_change, 
+             confidence, current_rsi, prev_rsi, current_price, prev_price, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', data_to_insert)
+        
+        conn.commit()
+        conn.close()
+        print(f"✅ 已保存 {len(data_to_insert)} 条RSI背离信号")
+    
+    def save_trend_signals(self, symbol: str, stock_name: str, signals_data: list):
+        """
+        保存趋势信号到数据库
+        
+        Args:
+            symbol: 股票代码
+            stock_name: 股票名称
+            signals_data: 趋势信号数据列表
+        """
+        if not signals_data:
+            return
+            
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # 先删除该股票的旧信号数据
+        cursor.execute('DELETE FROM trend_signals WHERE symbol = ?', (symbol,))
+        
+        # 准备数据
+        data_to_insert = []
+        for signal in signals_data:
+            data_to_insert.append((
+                symbol, stock_name, signal.date, signal.signal_type, 
+                signal.price, signal.trend_value, datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            ))
+        
+        cursor.executemany('''
+            INSERT INTO trend_signals 
+            (symbol, stock_name, date, signal_type, price, trend_value, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', data_to_insert)
+        
+        conn.commit()
+        conn.close()
+        print(f"✅ 已保存 {len(data_to_insert)} 条趋势信号")
+    
+    def get_latest_indicators(self, symbol: str) -> dict:
+        """
+        获取最新的技术指标摘要
+        
+        Args:
+            symbol: 股票代码
+            
+        Returns:
+            技术指标摘要字典
+        """
+        conn = sqlite3.connect(self.db_path)
+        
+        # 获取最新指标数据
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM technical_indicators 
+            WHERE symbol = ? 
+            ORDER BY date DESC 
+            LIMIT 1
+        ''', (symbol,))
+        
+        latest_indicator = cursor.fetchone()
+        # 在查询后立即获取列描述
+        indicator_cols = [desc[0] for desc in cursor.description] if cursor.description else []
+        
+        if not latest_indicator:
+            conn.close()
+            return None
+        
+        # 获取高置信度背离信号
+        cursor.execute('''
+            SELECT * FROM rsi_divergences 
+            WHERE symbol = ? AND confidence >= 50 
+            ORDER BY date DESC, confidence DESC 
+            LIMIT 3
+        ''', (symbol,))
+        
+        divergences = cursor.fetchall()
+        
+        # 获取最近的趋势信号
+        cursor.execute('''
+            SELECT * FROM trend_signals 
+            WHERE symbol = ? 
+            ORDER BY date DESC 
+            LIMIT 5
+        ''', (symbol,))
+        
+        trend_signals = cursor.fetchall()
+        
+        conn.close()
+        
+        # 构建返回数据 - 使用正确的列描述
+        latest_data = dict(zip(indicator_cols, latest_indicator)) if latest_indicator else None
+        
+        return {
+            'stock_name': latest_data['stock_name'] if latest_data else None,
+            'latest_date': latest_data['date'] if latest_data else None,
+            'calculation_time': latest_data['updated_at'] if latest_data else None,
+            'current_indicators': latest_data,
+            'recent_divergences': [dict(zip([
+                'symbol', 'stock_name', 'date', 'prev_date', 'type', 'timeframe',
+                'rsi_change', 'price_change', 'confidence', 'current_rsi', 'prev_rsi',
+                'current_price', 'prev_price', 'created_at'
+            ], div)) for div in divergences],
+            'recent_trend_signals': [dict(zip([
+                'id', 'symbol', 'stock_name', 'date', 'signal_type', 'price', 'trend_value', 'created_at'
+            ], signal)) for signal in trend_signals]
+        }
+    
+    def get_indicators_dataframe(self, symbol: str) -> pd.DataFrame:
+        """
+        获取技术指标数据的DataFrame
+        
+        Args:
+            symbol: 股票代码
+            
+        Returns:
+            包含技术指标的DataFrame
+        """
+        conn = sqlite3.connect(self.db_path)
+        
+        query = '''
+            SELECT date, rsi14, ma10, upper_band, lower_band, trend
+            FROM technical_indicators 
+            WHERE symbol = ? 
+            ORDER BY date ASC
+        '''
+        
+        df = pd.read_sql_query(query, conn, params=(symbol,))
+        conn.close()
+        
+        if not df.empty:
+            df['date'] = pd.to_datetime(df['date'])
+        
+        return df
+    
     def optimize_database(self):
         """优化数据库性能"""
         conn = sqlite3.connect(self.db_path)

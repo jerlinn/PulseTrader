@@ -45,8 +45,10 @@ def create_stock_chart(df, stock_name, divergences, today):
     _add_signal_markers(fig, df)
 
     # 添加 RSI 指标线到第三个子图
+    # 检查 RSI 列名（rsi14 或 rsi）
+    rsi_col = 'rsi14' if 'rsi14' in df.columns else 'rsi'
     fig.add_trace(go.Scatter(
-        x=df['日期'], y=df['rsi'],
+        x=df['日期'], y=df[rsi_col],
         mode='lines',
         line=dict(color='#FF8C1E', width=2),
         name='RSI'
@@ -72,12 +74,21 @@ def create_stock_chart(df, stock_name, divergences, today):
 
 def _add_ma10_line(fig, df):
     """添加MA10移动平均线"""
-    # 计算10日移动平均线
-    ma_10 = df['收盘'].rolling(window=10).mean()
+    # 检查是否有已计算的 ma10 列，如果没有则计算
+    if 'ma10' in df.columns:
+        ma_10 = df['ma10']
+    else:
+        # 作为后备，如果数据库中没有 ma10，则临时计算
+        ma_10 = df['收盘'].rolling(window=10).mean()
 
     # 初始化 MA10 颜色列表
     ma10_colors = []
 
+    # 确保 trend 列存在
+    if 'trend' not in df.columns:
+        print("⚠️  MA10绘制: 缺少 trend 列，使用默认中性颜色")
+        df['trend'] = 0  # 添加默认 trend 列
+    
     # 遍历数据，根据趋势设置 MA10 颜色
     for trend in df['trend']:
         if trend == -1:
@@ -104,6 +115,11 @@ def _add_ma10_line(fig, df):
 
 def _add_trend_filling(fig, df):
     """添加趋势填充区域"""
+    # 确保 trend 列存在
+    if 'trend' not in df.columns:
+        print("⚠️  趋势填充: 缺少 trend 列，跳过填充")
+        return
+        
     # 检测趋势变化
     df['Trend_Change'] = df['trend'].diff()
 
@@ -138,6 +154,11 @@ def _add_trend_filling(fig, df):
 
 def _add_signal_markers(fig, df):
     """添加买卖信号标记"""
+    # 确保 trend 列存在
+    if 'trend' not in df.columns:
+        print("⚠️  信号标记: 缺少 trend 列，跳过信号标记")
+        return
+        
     # 计算趋势变化点
     df['trend_shifted'] = df['trend'].shift(1)
     b_positions = df[(df['trend'] == 1) & (df['trend_shifted'] != 1)].index

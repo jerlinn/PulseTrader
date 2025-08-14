@@ -2,8 +2,7 @@ from datetime import datetime
 import pandas as pd
 from stock_data_provider import create_data_provider
 from plotting_component import create_stock_chart
-from rsi_component import calculate_rsi, detect_rsi_divergence
-from supertrend_component import calculate_supertrend
+from indicators_storage import enhance_analysis_with_indicators
 import os
 
 # 以量价关系为主要量化依据
@@ -46,19 +45,80 @@ def analyze_stock(stock_name, period='1年'):
         print("❌ 无法获取股票数据")
         return None
 
-    # 计算 SuperTrend 指标
-    df = calculate_supertrend(df, lookback_periods=14, multiplier=2)
-
-    # 计算RSI指标
-    rsi = calculate_rsi(df)
-    df['rsi'] = rsi
-
-    # 检测RSI背离
-    divergences = detect_rsi_divergence(df, rsi)
+    # 计算并存储技术指标
+    enhanced_result = enhance_analysis_with_indicators(df, stock_name, symbol)
+    
+    # 使用增强后的数据框
+    enhanced_df = enhanced_result['enhanced_dataframe']
+    indicators_summary = enhanced_result['indicators_summary']
+    
+    # 从存储结果中获取背离数据
+    divergences_list = enhanced_result['storage_result']['rsi_divergences']
+    
+    # 转换背离数据为DataFrame格式以兼容绘图函数
+    if divergences_list:
+        divergences_data = []
+        for div in divergences_list:
+            divergences_data.append({
+                'date': pd.to_datetime(div.date),
+                'prev_date': pd.to_datetime(div.prev_date),
+                'type': div.type,
+                'timeframe': div.timeframe,
+                'rsi_change': div.rsi_change,
+                'price_change': div.price_change,
+                'confidence': div.confidence,
+                'current_price': div.current_price,
+                'prev_price': div.prev_price,
+                'current_rsi': div.current_rsi,
+                'prev_rsi': div.prev_rsi
+            })
+        divergences = pd.DataFrame(divergences_data).sort_values('confidence', ascending=False)
+    else:
+        divergences = pd.DataFrame()
 
     # 创建图表并显示
-    fig = create_stock_chart(df, stock_name, divergences, today)
+    fig = create_stock_chart(enhanced_df, stock_name, divergences, today)
     fig.show()
+    
+    # 打印技术指标摘要
+    if indicators_summary:
+        current = indicators_summary['current_indicators']
+        
+        # 格式化趋势状态
+        trend_status = "上升" if current['trend'] == 1 else "下降" if current['trend'] == -1 else "中性"
+        
+        # 格式化趋势上下轨
+        upper_band = current['upper_band'] if current['upper_band'] is not None else "None"
+        lower_band = current['lower_band'] if current['lower_band'] is not None else "None"
+        
+        print(f"\n📊 {stock_name} · {current['date']} 技术指标：")
+        print(f"RSI14: {current['rsi14']}")
+        print(f"MA10: {current['ma10']}")
+        print(f"趋势上轨: {upper_band}")
+        print(f"趋势下轨: {lower_band}")
+        print(f"趋势状态: {trend_status}")
+        
+        # 显示今日和最新趋势信号
+        today_date = datetime.today().strftime('%Y-%m-%d')
+        today_signal_text = "None"
+        latest_signal_text = ""
+        
+        if indicators_summary['recent_trend_signals']:
+            # 检查是否有今日信号
+            for signal in indicators_summary['recent_trend_signals']:
+                if signal['date'] == today_date:
+                    signal_type = "B" if signal['signal_type'] == 'buy' else "S"
+                    today_signal_text = f"{signal_type} @ {signal['price']}"
+                    break
+            
+            # 获取最新信号
+            recent_signal = indicators_summary['recent_trend_signals'][0]
+            signal_text = "B" if recent_signal['signal_type'] == 'buy' else "S"
+            latest_signal_text = f"{recent_signal['date']} {signal_text} {recent_signal['price']}"
+        
+        print(f"今日趋势信号：{today_signal_text}")
+        if latest_signal_text:
+            print(f"最新信号：{latest_signal_text}")
     
     return fig
 

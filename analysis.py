@@ -6,6 +6,7 @@ import io
 import json
 from datetime import datetime
 import re
+from indicators_storage import IndicatorsStorage
 
 # ========== Configuration ==========
 
@@ -160,7 +161,7 @@ def format_content(content):
     return '\n'.join(formatted_lines)
 
 def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=None):
-    """Save report as MD"""
+    """Save report as MD with technical indicators data"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
     # 生成文件名
@@ -173,7 +174,46 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
     
     # 格式化内容
     formatted_content = format_content(extracted_content['content'])
-    # formatted_reasoning = format_content(extracted_content['reasoning'])
+    
+    # 获取技术指标数据
+    indicators_section = ""
+    if stock_symbol:
+        storage = IndicatorsStorage()
+        indicators_summary = storage.get_latest_indicators(stock_symbol)
+        
+        if indicators_summary:
+            current = indicators_summary['current_indicators']
+            indicators_section = f"""
+## 技术指标数据
+
+**最新数据日期**: {current['date']}
+
+### 核心指标
+- **RSI14**: {current['rsi14']}
+- **MA10**: {current['ma10']}
+- **趋势上轨**: {current['upper_band']}
+- **趋势下轨**: {current['lower_band']}
+- **趋势状态**: {"上升" if current['trend'] == 1 else "下降" if current['trend'] == -1 else "中性"}
+
+### 背离信号
+"""
+            
+            if indicators_summary['recent_divergences']:
+                for div in indicators_summary['recent_divergences'][:3]:
+                    div_type = "顶背离" if div['type'] == 'bearish' else "底背离"
+                    timeframe = {"short": "短期", "medium": "中期", "long": "长期"}.get(div['timeframe'], div['timeframe'])
+                    indicators_section += f"- **{div['date']}**: {div_type}({timeframe}) - 置信度: {div['confidence']}%\n"
+            else:
+                indicators_section += "- 暂无显著背离信号\n"
+            
+            indicators_section += "\n### 趋势信号\n"
+            
+            if indicators_summary['recent_trend_signals']:
+                for signal in indicators_summary['recent_trend_signals'][:3]:  # 取前3个最新信号
+                    signal_text = "B" if signal['signal_type'] == 'buy' else "S"
+                    indicators_section += f"- **{signal['date']}**: {signal_text} @ {signal['price']}\n"
+            else:
+                indicators_section += "- 暂无趋势变化信号\n"
     
     # 图表部分（如果有图片路径）
     chart_section = ""
@@ -192,14 +232,14 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
 
 **生成时间**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}  
 
-{chart_section}
-## 分析结果
+{chart_section}{indicators_section}
+## AI 分析结果
 
 {formatted_content}
 
 ---
 
-*本报告由 TrendSight AI 自动生成*
+*本报告由 TrendSight AI 自动生成，技术指标数据已持久化存储*
 """
     
     # 保存文件
@@ -208,6 +248,78 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
     
     print(f"分析报告已保存至: {filepath}")
     return filepath
+
+def get_technical_indicators_context(chart_image_path):
+    """从图片路径推断股票并获取技术指标上下文"""
+    if not chart_image_path or not os.path.exists(chart_image_path):
+        return ""
+    
+    # 从文件名推断股票名称
+    filename = os.path.basename(chart_image_path)
+    stock_name = filename.split('_')[0] if '_' in filename else None
+    
+    if not stock_name:
+        return ""
+    
+    # 获取股票代码
+    try:
+        from stock_data_provider import create_data_provider
+        data_provider = create_data_provider()
+        stock_info = data_provider.get_stock_info()
+        stock_symbol = data_provider.get_stock_symbol(stock_info, stock_name)
+        
+        # 获取技术指标数据
+        storage = IndicatorsStorage()
+        indicators_summary = storage.get_latest_indicators(stock_symbol)
+        
+        if indicators_summary:
+            current = indicators_summary['current_indicators']
+            
+            # 格式化趋势状态
+            trend_status = "上升" if current['trend'] == 1 else "下降" if current['trend'] == -1 else "中性"
+            
+            # 格式化趋势上下轨
+            upper_band = current['upper_band'] if current['upper_band'] is not None else "None"
+            lower_band = current['lower_band'] if current['lower_band'] is not None else "None"
+            
+            # 格式化今日和最新趋势信号
+            today_date = datetime.now().strftime('%Y-%m-%d')
+            today_signal_text = "None"
+            latest_signal_text = ""
+            
+            if indicators_summary['recent_trend_signals']:
+                # 检查是否有今日信号
+                for signal in indicators_summary['recent_trend_signals']:
+                    if signal['date'] == today_date:
+                        signal_type = "B" if signal['signal_type'] == 'buy' else "S"
+                        today_signal_text = f"{signal_type} @ {signal['price']}"
+                        break
+                
+                # 获取最新信号
+                recent_signal = indicators_summary['recent_trend_signals'][0]
+                signal_type = "B" if recent_signal['signal_type'] == 'buy' else "S"
+                latest_signal_text = f"{recent_signal['date']} {signal_type} {recent_signal['price']}"
+            
+            context = f"""技术指标背景数据：
+
+📊 {stock_name} · {current['date']} 技术指标：
+RSI14: {current['rsi14']}
+MA10: {current['ma10']}
+趋势上轨: {upper_band}
+趋势下轨: {lower_band}
+趋势状态: {trend_status}
+今日趋势信号：{today_signal_text}"""
+            
+            if latest_signal_text:
+                context += f"\n最新信号：{latest_signal_text}"
+            
+            return context + "\n\n"
+    
+    except Exception as e:
+        print(f"获取技术指标上下文时出错: {e}")
+        return ""
+    
+    return ""
 
 client = OpenAI(
     api_key=os.getenv("AIHUBMIX_API_KEY"),
@@ -221,6 +333,9 @@ def load_system_prompt():
     except FileNotFoundError:
         print("警告：找不到 analyst_prompt.md 文件，使用默认提示")
         return "你是专业的股票分析师，请分析股票走势并提供投资建议。"
+
+# 获取技术指标上下文
+technical_context = get_technical_indicators_context(CHART_IMAGE_PATH)
 
 response = client.responses.create(
     model="gpt-5", # gpt-5, gpt-5-chat-latest, gpt-5-mini, gpt-5-nano
@@ -240,7 +355,7 @@ response = client.responses.create(
         {
             "role": "user",
             "content": [
-                { "type": "input_text", "text": "分析当前的股票走势，提供投资建议" },
+                { "type": "input_text", "text": f"{technical_context}分析当前的股票走势，提供投资建议" },
                 {
                     "type": "input_image",
                     "image_url": f"data:image/png;base64,{encode_image(CHART_IMAGE_PATH)}",
@@ -273,7 +388,6 @@ response_events = []
 print(f"{Colors.BOLD}🤖 AI 分析中...{Colors.ENDC}")
 if SHOW_REASONING_IN_TERMINAL:
     print(f"{Colors.YELLOW}📝 (包含推理过程){Colors.ENDC}")
-print("-" * 50)
 
 def process_reasoning_content(content):
     """处理推理内容，按句子单位显示"""
@@ -305,7 +419,6 @@ def process_reasoning_content(content):
     for sentence in sentences:
         if not reasoning_started:
             print(f"\n\n{Colors.BLUE}🧠 [推理过程]:{Colors.ENDC}")
-            print(f"{Colors.BLUE}{'-' * 40}{Colors.ENDC}")
             reasoning_started = True
         
         print(f"{Colors.BLUE}{sentence}{Colors.ENDC}")

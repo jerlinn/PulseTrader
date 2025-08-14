@@ -1,8 +1,10 @@
 ## Script Design
 - Strictly follow the KISS principle and the Zen of Python; avoid over-engineering
 - Add necessary comments only for complex logic
-
+- 不要自动运行 TrendInsigt.py
+  
 ## Documentation Guidelines
+- 每次迭代之后都要自动检查 @Read.md，对齐逻辑
 - Communicate as equals; do not use any honorifics such as「您」
 - If query = Chinese: punctuation style example — use full-width commas and 「corner brackets」 for quotation marks; insert one space before and after numbers and Latin letters
 - Make good use of verbs that convey expressive tension

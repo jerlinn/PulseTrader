@@ -37,22 +37,67 @@ TrendSight 采用**分离式架构设计**，确保计算的绝对精确性和 A
 
 ```mermaid
 graph TD
-    A([用户输入股票名称]) --> B[数据层<br/>stock_data_provider]
-    B --> C[指标层<br/>supertrend_component]
-    B --> D[信号层<br/>rsi_component]
-    C --> E[可视化层<br/>plotting_component]
-    D --> E
-    E --> F([交互式图表输出])
-    G[应用层<br/>TrendInsigt-1Y] --> A
+    %% 用户交互层 - 圆角矩形
+    USER([用户输入股票名称]) --> APP([应用层<br/>TrendInsigt.py])
     
-    style A fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    style B fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    style C fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style D fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style E fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
-    style F fill:#e1f5fe,stroke:#01579b,stroke-width:2px
-    style G fill:#fff8e1,stroke:#f57f17,stroke-width:2px
+    %% 数据处理层 - 矩形
+    APP --> DATA[数据层<br/>stock_data_provider]
+    DATA --> CACHE[(缓存层<br/>stock_cache.py<br/>SQLite Database)]
+    
+    %% 计算引擎层 - 六边形
+    CACHE --> SUPER{{指标层<br/>supertrend_component}}
+    CACHE --> RSI{{信号层<br/>rsi_component}}
+    
+    %% 存储管理层 - 梯形
+    SUPER --> STORE[/存储层<br/>indicators_storage\]
+    RSI --> STORE
+    STORE --> CACHE
+    
+    %% 输出层 - 圆角矩形和菱形
+    STORE --> VIZ[可视化层<br/>plotting_component]
+    VIZ --> CHART([交互式图表输出])
+    
+    %% AI 分析层 - 云形状
+    STORE --> AI{{AI分析<br/>analysis.py<br/>GPT-5}}
+    AI --> REPORT([智能分析报告])
+    
+    %% 工具层 - 圆形
+    QUERY((查询工具<br/>indicators_query.py)) --> CACHE
+    
+    %% 用户交互层样式 - 蓝色系
+    classDef userLayer fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,color:#000
+    class USER,APP,CHART,REPORT userLayer
+    
+    %% 数据层样式 - 紫色系
+    classDef dataLayer fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
+    class DATA dataLayer
+    
+    %% 存储层样式 - 红色系，加粗边框表示核心
+    classDef storageLayer fill:#ffebee,stroke:#d32f2f,stroke-width:4px,color:#000
+    class CACHE storageLayer
+    
+    %% 计算层样式 - 橙色系
+    classDef computeLayer fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000
+    class SUPER,RSI computeLayer
+    
+    %% 存储管理样式 - 绿色系
+    classDef mgmtLayer fill:#e8f5e8,stroke:#388e3c,stroke-width:2px,color:#000
+    class STORE,VIZ mgmtLayer
+    
+    %% AI层样式 - 黄色系
+    classDef aiLayer fill:#fff8e1,stroke:#ffa000,stroke-width:2px,color:#000
+    class AI aiLayer
+    
+    %% 工具层样式 - 青色系
+    classDef toolLayer fill:#e0f2f1,stroke:#00695c,stroke-width:2px,color:#000
+    class QUERY toolLayer
 ```
+
+### 统一数据库架构（消除存储重叠）
+- **一库统管**：SQLite 数据库统一存储原始数据和技术指标，消除重复存储
+- **关系型设计**：5张数据表科学设计，确保数据完整性和查询效率
+- **智能缓存**：避免重复计算，支持增量更新和快速查询
+- **持久化存储**：所有技术指标数据完整保存，支持历史分析和回测
 
 ### 精确计算引擎（100% 可靠算法）
 - **严格数据验证**：每一个数据点都经过完整性和准确性检查
@@ -60,35 +105,64 @@ graph TD
 - **零近似计算**：SuperTrend、RSI等所有指标计算都使用精确数学公式
 - **多时间框架验证**：短期、中期、长期三层验证机制过滤假信号
 
-### 智能洞察层（AI负责解读）
+### 数据库表结构设计
 
 ```mermaid
-graph TB
-    subgraph "精确计算域 (100%可靠算法)"
-        A[原始股票数据] --> B[Wilder平滑RSI]
-        A --> C[ATR-based SuperTrend]
-        B --> D[背离点检测]
-        C --> E[趋势变化点]
-    end
+erDiagram
+    stock_data ||--o{ technical_indicators : symbol
+    technical_indicators ||--o{ rsi_divergences : symbol
+    technical_indicators ||--o{ trend_signals : symbol
+    stock_data ||--|| stock_info : code
     
-    subgraph "智能洞察域 (AI辅助分析)"
-        D --> F[信号置信度评估]
-        E --> F
-        F --> G[市场模式识别]
-        G --> H[风险评估建议]
-        H --> I[自然语言解读]
-    end
+    stock_data {
+        string symbol PK
+        string date PK
+        real open_price
+        real high_price  
+        real low_price
+        real close_price
+        integer volume
+        datetime updated_at
+    }
     
-    style A fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    style B fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
-    style C fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
-    style D fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
-    style E fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
-    style F fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style G fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style H fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style I fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
+    technical_indicators {
+        string symbol PK
+        string date PK
+        real rsi14
+        real ma10
+        integer trend
+        real upper_band
+        real lower_band
+    }
+    
+    rsi_divergences {
+        integer id PK
+        string symbol
+        string date
+        string type
+        string timeframe
+        real confidence
+        real current_rsi
+        real prev_rsi
+    }
+    
+    trend_signals {
+        integer id PK
+        string symbol
+        string date
+        string signal_type
+        real price
+        real trend_value
+    }
+    
+    stock_info {
+        string code PK
+        string name
+        datetime updated_at
+    }
 ```
+
+### 智能洞察层（AI负责解读）
 
 - **信号置信度评估**：AI量化每个交易信号的可靠性
 - **市场模式识别**：基于历史数据识别相似的市场环境
@@ -99,23 +173,41 @@ graph TB
 
 ```mermaid
 graph LR
-    A([复杂的市场信息]) --> B{过滤机制}
-    B --> |基本面| C[❌ 财报迷宫]
-    B --> |舆情| D[❌ 新闻噪音] 
-    B --> |量价关系| E[✅ 核心信号]
+    %% 输入层 - 圆角矩形表示复杂信息
+    COMPLEX([复杂的市场信息]) --> FILTER{过滤机制}
     
-    E --> F[SuperTrend<br/>趋势判断]
-    E --> G[RSI背离<br/>情绪极值]
-    F --> H([清晰的投资信号])
-    G --> H
+    %% 过滤分支 - 菱形决策节点
+    FILTER --> |基本面| NOISE1[/❌ 财报迷宫\]
+    FILTER --> |舆情| NOISE2[/❌ 新闻噪音\] 
+    FILTER --> |量价关系| CORE([✅ 核心信号])
     
-    style A fill:#ffebee,stroke:#c62828,stroke-width:2px
-    style C fill:#ffebee,stroke:#c62828,stroke-width:2px
-    style D fill:#ffebee,stroke:#c62828,stroke-width:2px
-    style E fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px
-    style F fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style G fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style H fill:#e1f5fe,stroke:#01579b,stroke-width:2px
+    %% 核心分析层 - 六边形表示处理引擎
+    CORE --> TREND{{SuperTrend<br/>趋势判断}}
+    CORE --> RSI_DIV{{RSI背离<br/>情绪极值}}
+    
+    %% 输出层 - 圆角矩形表示最终结果
+    TREND --> SIGNAL([清晰的投资信号])
+    RSI_DIV --> SIGNAL
+    
+    %% 噪音信息样式 - 红色系，表示要过滤的信息
+    classDef noiseLayer fill:#ffebee,stroke:#d32f2f,stroke-width:2px,color:#000
+    class COMPLEX,NOISE1,NOISE2 noiseLayer
+    
+    %% 过滤决策样式 - 灰色系
+    classDef filterLayer fill:#f5f5f5,stroke:#616161,stroke-width:2px,color:#000
+    class FILTER filterLayer
+    
+    %% 核心信号样式 - 绿色系，表示有价值的信息
+    classDef coreLayer fill:#e8f5e8,stroke:#2e7d32,stroke-width:3px,color:#000
+    class CORE coreLayer
+    
+    %% 分析引擎样式 - 橙色系
+    classDef engineLayer fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000
+    class TREND,RSI_DIV engineLayer
+    
+    %% 最终输出样式 - 蓝色系，加粗表示重要性
+    classDef outputLayer fill:#e3f2fd,stroke:#1976d2,stroke-width:3px,color:#000
+    class SIGNAL outputLayer
 ```
 
 - **一目了然的可视化**：对数坐标系统，直观展现价格变化本质
@@ -127,15 +219,15 @@ graph LR
 
 ### 对数据精确性的承诺
 - **100% 算法可靠性**：每个计算结果都可以手工验证和复现
-- **零容忍近似值**：拒绝"差不多就行"的模糊计算
-- **透明化流程**：所有计算逻辑完全开源，接受社区审查
+- **零容忍近似值**：拒绝一切近似，LLM 推理和数据计算完全剥离
+- **透明化流程**：所有计算逻辑完全开源
 - **严格测试覆盖**：确保边界条件下的计算准确性
 
 ### 为普通投资者而设计
 - **极简交互**：输入股票名称即可开始分析，无需追踪复杂新闻和财报
 - **专业图表**：对数坐标系直观展现价格波动本质，摆脱信息噪音干扰
 - **人性量化**：RSI背离检测直接捕捉市场贪婪与恐惧的临界点
-- **数学严谨**：严格阈值（顶背离80，底背离20/30）过滤90%情绪化假信号
+- **数学严谨**：严格阈值（顶背离 80，底背离20/30）过滤 90% 情绪化假信号
 - **置信度量化**：每个信号都有明确的可靠性评分，避免盲目跟风
 
 ### 开发者友好的架构
@@ -160,21 +252,38 @@ cd TrendSight
 # 安装依赖
 pip install -r requirements.txt
 
-# 运行分析
-python TrendInsigt-1Y.py
+# 运行交互式股票分析
+python TrendInsigt.py
+
+# 或运行 AI 分析（需要 AIHUBMIX_API_KEY 环境变量）
+python analysis.py
+
+# 查询已存储的技术指标
+python indicators_query.py --list
+python indicators_query.py 杭钢股份
+python indicators_query.py 杭钢股份 --export
 ```
 
 ## 📖 项目结构
 
 ```
 TrendSight/
-├── TrendInsigt.py          # 主程序入口
-├── plotting_component.py      # 绘图组件
-├── rsi_component.py           # RSI 计算与背离检测
-├── supertrend_component.py    # SuperTrend 指标计算
-├── stock_data_provider.py     # 数据提供者接口
-├── figures/                   # 生成的图表文件
-└── requirements.txt           # 项目依赖
+├── TrendInsigt.py              # 主程序入口（交互式股票分析）
+├── analysis.py                 # AI 分析模块（GPT-5 集成）
+├── plotting_component.py       # 绘图组件（对数坐标可视化）
+├── rsi_component.py            # RSI 计算与背离检测
+├── supertrend_component.py     # SuperTrend 指标计算
+├── stock_data_provider.py      # 数据提供者接口
+├── stock_cache.py              # 统一数据库管理（SQLite）
+├── indicators_storage.py       # 技术指标计算和存储
+├── indicators_query.py         # 数据查询和导出工具
+├── cache/
+│   └── stock_data.db           # SQLite 数据库（统一存储）
+├── figures/                    # 生成的图表文件
+├── reports/                    # AI 分析报告（Markdown）
+├── analyst_prompt.md           # AI 分析师 system prompt
+├── 技术指标存储使用说明.md       # 数据存储系统文档
+└── requirements.txt            # 项目依赖
 ```
 
 ## Todo
@@ -185,10 +294,23 @@ TrendSight/
   - [x] 图片读取
   - [x] 把 response 对象中的目标内容提取为 md 文档到 reports 目录
   - [x] 把传入的股票图表 encode_image，放到 report 文档，作为头部贴图
+  
+- [x] 数据结构优化，实现数据持久化机制
+  - [x] SQLite 统一数据库架构设计
+  - [x] 技术指标数据表结构设计（RSI14、MA10、趋势上下轨）
+  - [x] RSI背离信号存储（类型、时间框架、置信度）
+  - [x] 趋势变化信号存储（买入/卖出点）
+  - [x] 智能缓存机制，避免重复计算
+- [x] 用于进一步分析的数据结构设计，增加输出模块，存储 csv
+  - [x] indicators_query.py 数据查询工具
+  - [x] CSV 导出功能（`python indicators_query.py 股票名称 --export`）
+  - [x] 数据库统计和管理功能
+- [x] 数据交互设计优化：股票名称 → 数据和图表 → LLM → 报告
+  - [x] 终端交互优化，实时显示技术指标摘要
+  - [ ] 重要数据指标传入 user message
+  - [x] AI 分析报告自动包含技术指标数据
+  - [x] 流式输出和彩色终端支持
 
-- [ ] 调用 py 的部分能够做成 Function Calling
-- [ ] 数据交互设计优化：股票名称 → 数据和图表 → LLM → 报告
-- [ ] 用于进一步分析的数据结构设计，增加输出模块，存储 csv
 - [ ] 完整 system prompt
 
 ## 🤝 贡献指南
