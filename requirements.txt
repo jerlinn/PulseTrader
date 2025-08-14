@@ -1,0 +1,23 @@
+# 核心数据处理
+pandas>=2.0.0
+numpy>=1.24.0
+
+# 股票数据获取
+akshare>=1.12.0
+
+# 技术指标计算
+stock-indicators>=1.0.0
+
+# 图表可视化
+plotly>=5.15.0
+kaleido>=0.2.1
+
+# AI接口支持（可选）
+openai>=1.0.0
+
+# Python标准库（无需安装）
+# datetime
+# decimal
+# os
+# sqlite3
+# typing
