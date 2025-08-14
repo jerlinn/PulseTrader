@@ -214,6 +214,14 @@ client = OpenAI(
     base_url="https://aihubmix.com/v1"
 )
 
+def load_system_prompt():
+    try:
+        with open('analyst_prompt.md', 'r', encoding='utf-8') as f:
+            return f.read()
+    except FileNotFoundError:
+        print("警告：找不到 analyst_prompt.md 文件，使用默认提示")
+        return "你是专业的股票分析师，请分析股票走势并提供投资建议。"
+
 response = client.responses.create(
     model="gpt-5", # gpt-5, gpt-5-chat-latest, gpt-5-mini, gpt-5-nano
     tools=[
@@ -223,6 +231,12 @@ response = client.responses.create(
         }
     ],
     input=[
+        {
+            "role": "system",
+            "content": [
+                { "type": "input_text", "text": load_system_prompt() }
+            ]
+        },
         {
             "role": "user",
             "content": [
