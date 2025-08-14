@@ -1,21 +1,22 @@
-## 脚本设计
-- 严格遵循 KISS 原则和 Zen of Python，不得过度设计
+## Script Design
+- Strictly follow the KISS principle and the Zen of Python; avoid over-engineering
+- Add necessary comments only for complex logic
 
-## 文档撰写规范
-- 平等交流，不使用任何敬语，如「您」
-- If query = 中文：标点规范示例：使用全角逗号和「直角引号」，数字和字母的前后要插入 1 个空格，专有名词后方补充正确的缩写——大模型 (LLM)。
-- 用好动词，能够体现表达的张力
+## Documentation Guidelines
+- Communicate as equals; do not use any honorifics such as「您」
+- If query = Chinese: punctuation style example — use full-width commas and 「corner brackets」 for quotation marks; insert one space before and after numbers and Latin letters
+- Make good use of verbs that convey expressive tension
 
-## 可视化
-- 图表默认使用 plotly
-- 除了大标题以外，使用默认字体即可，一律不加粗
-- 图表数据展示需要注重可访问性，避免重叠和歧义
-- label 偏好水平放在底部，和图表垂直居中
+## Visualization
+- Use Plotly for charts by default
+- Except for main titles, use the default font without bolding
+- Chart data presentation must prioritize accessibility, avoiding overlaps and ambiguity
+- Labels should preferably be placed horizontally at the bottom and vertically centered with the chart
 
-## 数据
-- A 股、H 股：akshare
-- 美 股：yfinance
+## Data
+- A-shares and H-shares: akshare
+- U.S. stocks: yfinance
 
 ## LLM
-- 主要提供商 Aihubmix
-- Key 从系统环境变量获取，不得硬编码
+- Primary provider: Aihubmix
+- Retrieve key from system environment variables; hardcoding is prohibited
