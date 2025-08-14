@@ -22,3 +22,20 @@
 ## LLM
 - Primary provider: Aihubmix
 - Retrieve key from system environment variables; hardcoding is prohibited
+
+## Project Strcture
+TrendSight/
+├── TrendInsigt.py              # 主程序入口（交互式股票分析）
+├── analysis.py                 # AI 分析模块（GPT-5 集成）
+├── plotting_component.py       # 绘图组件（对数坐标可视化）
+├── rsi_component.py            # RSI 计算与背离检测
+├── supertrend_component.py     # SuperTrend 指标计算
+├── stock_data_provider.py      # 数据提供者接口
+├── stock_cache.py              # 统一数据库管理（SQLite）
+├── indicators_storage.py       # 技术指标计算和存储
+├── indicators_query.py         # 数据查询和导出工具
+├── cache/
+│   └── stock_data.db           # SQLite 数据库（统一存储）
+├── figures/                    # 生成的图表文件
+├── reports/                    # AI 分析报告（Markdown）
+└──analyst_prompt.md           # AI 分析师 system prompt
