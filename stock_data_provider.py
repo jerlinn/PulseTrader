@@ -50,21 +50,29 @@ class StockDataProvider:
         """
         days = self.period_mapping.get(period, 365)
         start_date = (datetime.today() - timedelta(days=days)).strftime('%Y%m%d')
-        today = datetime.today().strftime('%Y%m%d')
         
-        print(f"📊 获取股票数据: {stock_name} ({period})")
+        # 获取最近的交易日作为结束日期，而不是今天
+        today_str = datetime.today().strftime('%Y-%m-%d')
+        last_trading_day = self.get_last_trading_day(today_str)
+        
+        if last_trading_day:
+            end_date = last_trading_day.replace('-', '')  # 转换为YYYYMMDD格式
+            print(f"📊 获取股票数据: {stock_name} ({period}) 至 {last_trading_day}")
+        else:
+            # 如果无法获取交易日历，回退到使用今天
+            end_date = datetime.today().strftime('%Y%m%d')
+            print(f"📊 获取股票数据: {stock_name} ({period}) - 无交易日历，使用今日")
         
         # 检查是否需要更新数据（基于交易日历）
         need_update, last_cached_date = self._needs_update_with_trading_calendar(stock_symbol)
         
         # 先尝试从缓存获取数据
-        cached_df = self.cache_manager.get_cached_data(stock_symbol, stock_name, start_date, today)
+        cached_df = self.cache_manager.get_cached_data(stock_symbol, stock_name, start_date, end_date)
         
         if not cached_df.empty and not need_update:
             # 检查今天是否为交易日，如果不是，提供更友好的提示
-            today_str = datetime.today().strftime('%Y-%m-%d')
             if not self.is_trading_day(today_str):
-                print(f"📅 今日非交易日，使用最新缓存数据")
+                print(f"📅 今日非交易日，使用最新交易日数据 ({last_trading_day})")
             else:
                 print(f"🎯 使用缓存数据，无需更新")
             return cached_df
@@ -73,10 +81,10 @@ class StockDataProvider:
         try:
             if need_update and last_cached_date:
                 # 增量更新：只获取最后缓存日期之后的数据
-                df = self._incremental_update(stock_symbol, stock_name, last_cached_date, today, cached_df, start_date)
+                df = self._incremental_update(stock_symbol, stock_name, last_cached_date, end_date, cached_df, start_date)
             else:
                 # 全量获取数据
-                df = self._full_update(stock_symbol, stock_name, start_date, today)
+                df = self._full_update(stock_symbol, stock_name, start_date, end_date)
             
             return df
             
@@ -89,16 +97,16 @@ class StockDataProvider:
                 return pd.DataFrame()
     
     def _incremental_update(self, stock_symbol: str, stock_name: str, last_cached_date: str, 
-                          today: str, cached_df: pd.DataFrame, start_date: str) -> pd.DataFrame:
+                          end_date: str, cached_df: pd.DataFrame, start_date: str) -> pd.DataFrame:
         """执行增量更新"""
         update_start_date = (datetime.strptime(last_cached_date, '%Y%m%d') + timedelta(days=1)).strftime('%Y%m%d')
-        print(f"🔄 增量更新数据，从 {update_start_date} 开始")
+        print(f"🔄 增量更新数据，从 {update_start_date} 到 {end_date}")
         
         new_df = ak.stock_zh_a_hist(
             symbol=stock_symbol, 
             period="daily", 
             start_date=update_start_date, 
-            end_date=today, 
+            end_date=end_date, 
             adjust="qfq"
         )
         
@@ -122,14 +130,14 @@ class StockDataProvider:
         
         return df
     
-    def _full_update(self, stock_symbol: str, stock_name: str, start_date: str, today: str) -> pd.DataFrame:
+    def _full_update(self, stock_symbol: str, stock_name: str, start_date: str, end_date: str) -> pd.DataFrame:
         """执行全量更新"""
-        print(f"📥 全量获取数据")
+        print(f"📥 全量获取数据，从 {start_date} 到 {end_date}")
         df = ak.stock_zh_a_hist(
             symbol=stock_symbol, 
             period="daily", 
             start_date=start_date, 
-            end_date=today, 
+            end_date=end_date, 
             adjust="qfq"
         )
         
@@ -168,10 +176,20 @@ class StockDataProvider:
         Raises:
             ValueError: 如果未找到股票
         """
+        # 首先尝试精确匹配
         matching_stocks = stock_info[stock_info['name'] == stock_name]
-        if matching_stocks.empty:
-            raise ValueError(f"未找到股票: {stock_name}")
-        return matching_stocks['code'].iloc[0]
+        if not matching_stocks.empty:
+            return matching_stocks['code'].iloc[0]
+        
+        # 处理XD前缀情况：XD占一个汉字位，尝试匹配XD+用户输入前3字符
+        if len(stock_name) >= 3:
+            xd_name = 'XD' + stock_name[:3]  # XD + 前3个字符
+            xd_matches = stock_info[stock_info['name'] == xd_name]
+            if not xd_matches.empty:
+                print(f"🔍 XD前缀匹配: {stock_name} → {xd_name} ({xd_matches.iloc[0]['code']})")
+                return xd_matches.iloc[0]['code']
+        
+        raise ValueError(f"未找到股票: {stock_name}")
     
     def show_cache_status(self):
         """显示缓存状态"""
