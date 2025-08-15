@@ -51,6 +51,7 @@ class StockDataCache:
                 low_price REAL,
                 close_price REAL,
                 volume INTEGER,
+                daily_change_pct REAL,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(symbol, date)
@@ -77,6 +78,7 @@ class StockDataCache:
                 date TEXT NOT NULL,
                 rsi14 REAL,
                 ma10 REAL,
+                daily_change_pct REAL,
                 trend INTEGER DEFAULT 0,
                 upper_band REAL,
                 lower_band REAL,
@@ -141,6 +143,22 @@ class StockDataCache:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_symbol_date ON trend_signals(symbol, date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_type ON trend_signals(signal_type)')
         
+        # 数据库升级：为现有的 stock_data 表添加 daily_change_pct 列（如果不存在）
+        try:
+            cursor.execute("ALTER TABLE stock_data ADD COLUMN daily_change_pct REAL")
+            print("✅ 已为 stock_data 表添加 daily_change_pct 列")
+        except sqlite3.OperationalError:
+            # 列已存在，忽略错误
+            pass
+            
+        # 数据库升级：为现有的 technical_indicators 表添加 daily_change_pct 列（如果不存在）
+        try:
+            cursor.execute("ALTER TABLE technical_indicators ADD COLUMN daily_change_pct REAL")
+            print("✅ 已为 technical_indicators 表添加 daily_change_pct 列")
+        except sqlite3.OperationalError:
+            # 列已存在，忽略错误
+            pass
+        
         conn.commit()
         conn.close()
     
@@ -161,7 +179,8 @@ class StockDataCache:
         
         query = '''
             SELECT date, open_price as 开盘, high_price as 最高, 
-                   low_price as 最低, close_price as 收盘, volume as 成交量
+                   low_price as 最低, close_price as 收盘, volume as 成交量,
+                   daily_change_pct as 日涨幅
             FROM stock_data 
             WHERE symbol = ? AND date BETWEEN ? AND ?
             ORDER BY date ASC
@@ -192,9 +211,16 @@ class StockDataCache:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # 准备数据
+        # 使用 akshare 提供的涨跌幅数据（如果存在），否则计算日涨幅
+        df = df.sort_values('日期').reset_index(drop=True)
+        if '涨跌幅' in df.columns:
+            df['日涨幅'] = df['涨跌幅']  # 直接使用 akshare 的涨跌幅字段
+        else:
+            df['日涨幅'] = df['收盘'].pct_change() * 100  # 回退到手动计算
+        
         data_to_insert = []
         for _, row in df.iterrows():
+            daily_change = None if pd.isna(row['日涨幅']) else round(float(row['日涨幅']), 4)
             data_to_insert.append((
                 symbol,
                 stock_name,
@@ -204,14 +230,15 @@ class StockDataCache:
                 float(row['最低']),
                 float(row['收盘']),
                 int(row['成交量']),
+                daily_change,
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             ))
         
         # 使用REPLACE INTO来处理重复数据
         cursor.executemany('''
             REPLACE INTO stock_data 
-            (symbol, stock_name, date, open_price, high_price, low_price, close_price, volume, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (symbol, stock_name, date, open_price, high_price, low_price, close_price, volume, daily_change_pct, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', data_to_insert)
         
         conn.commit()
@@ -450,6 +477,7 @@ class StockDataCache:
                 indicator.date,
                 indicator.rsi14,
                 indicator.ma10,
+                indicator.daily_change_pct,
                 indicator.trend,
                 indicator.upper_band,
                 indicator.lower_band,
@@ -459,8 +487,8 @@ class StockDataCache:
         # 使用REPLACE INTO处理重复数据
         cursor.executemany('''
             REPLACE INTO technical_indicators 
-            (symbol, stock_name, date, rsi14, ma10, trend, upper_band, lower_band, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (symbol, stock_name, date, rsi14, ma10, daily_change_pct, trend, upper_band, lower_band, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', data_to_insert)
         
         conn.commit()
@@ -623,7 +651,7 @@ class StockDataCache:
         conn = sqlite3.connect(self.db_path)
         
         query = '''
-            SELECT date, rsi14, ma10, upper_band, lower_band, trend
+            SELECT date, rsi14, ma10, daily_change_pct, upper_band, lower_band, trend
             FROM technical_indicators 
             WHERE symbol = ? 
             ORDER BY date ASC

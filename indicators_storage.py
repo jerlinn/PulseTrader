@@ -13,6 +13,7 @@ class TechnicalIndicators:
     date: str
     rsi14: Optional[float] = None
     ma10: Optional[float] = None
+    daily_change_pct: Optional[float] = None  # 日涨幅百分比
     # 统一的 SuperTrend 参数
     upper_band: Optional[float] = None  # SuperTrend 上轨
     lower_band: Optional[float] = None  # SuperTrend 下轨
@@ -104,6 +105,13 @@ class IndicatorsStorage:
         # 计算 MA10
         df['ma10'] = df['收盘'].rolling(window=10).mean()
         
+        # 处理日涨幅数据：优先使用 akshare 的涨跌幅，否则计算
+        if '涨跌幅' in df.columns:
+            df['日涨幅'] = df['涨跌幅']  # 直接使用 akshare 的涨跌幅字段
+        elif '日涨幅' not in df.columns:
+            df = df.sort_values('日期').reset_index(drop=True)
+            df['日涨幅'] = df['收盘'].pct_change() * 100
+        
         indicators_list = []
         rsi_values = []
         
@@ -135,6 +143,7 @@ class IndicatorsStorage:
                 date=date_str,
                 rsi14=safe_float(safe_get('rsi14')),
                 ma10=safe_float(safe_get('ma10')),
+                daily_change_pct=safe_float(safe_get('日涨幅'), 4),
                 upper_band=safe_float(safe_get('upper_band')),
                 lower_band=safe_float(safe_get('lower_band')),
                 trend=safe_int(safe_get('trend', 0)),

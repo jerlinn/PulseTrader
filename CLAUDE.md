@@ -1,6 +1,7 @@
 ## Script Design
 - Strictly follow the KISS principle and the Zen of Python; avoid over-engineering
 - Add necessary comments only for complex logic
+- 测试时最少取 15 日数据，否则无法计算 rsi14
 - 不要自动运行 TrendInsigt.py
   
 ## Documentation Guidelines
@@ -38,4 +39,4 @@ TrendSight/
 │   └── stock_data.db           # SQLite 数据库（统一存储）
 ├── figures/                    # 生成的图表文件
 ├── reports/                    # AI 分析报告（Markdown）
-└──analyst_prompt.md           # AI 分析师 system prompt
+└──analyst_prompt.md           # AI 分析师 system prompt，关键数据指标会通过 user message 传递

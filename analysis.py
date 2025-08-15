@@ -191,6 +191,7 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
 ### 核心指标
 - **RSI14**: {current['rsi14']}
 - **MA10**: {current['ma10']}
+- **日涨幅**: {f"{current['daily_change_pct']:.2f}%" if current.get('daily_change_pct') is not None else "无数据"}
 - **趋势上轨**: {current['upper_band']}
 - **趋势下轨**: {current['lower_band']}
 - **趋势状态**: {"上升" if current['trend'] == 1 else "下降" if current['trend'] == -1 else "中性"}
@@ -300,11 +301,16 @@ def get_technical_indicators_context(chart_image_path):
                 signal_type = "B" if recent_signal['signal_type'] == 'buy' else "S"
                 latest_signal_text = f"{recent_signal['date']} {signal_type} {recent_signal['price']}"
             
+            # 格式化日涨幅
+            daily_change = current.get('daily_change_pct', None)
+            daily_change_text = f"{daily_change:.2f}%" if daily_change is not None else "None"
+            
             context = f"""技术指标背景数据：
 
 📊 {stock_name} · {current['date']} 技术指标：
 RSI14: {current['rsi14']}
 MA10: {current['ma10']}
+日涨幅: {daily_change_text}
 趋势上轨: {upper_band}
 趋势下轨: {lower_band}
 趋势状态: {trend_status}
