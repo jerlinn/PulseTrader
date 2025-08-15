@@ -123,6 +123,15 @@ class StockDataCache:
             )
         ''')
         
+        # 创建交易日历表
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS trading_calendar (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                trade_date TEXT UNIQUE NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
         # 创建索引提高查询性能
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_symbol_date ON stock_data(symbol, date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_stock_name ON stock_data(stock_name)')
@@ -142,6 +151,9 @@ class StockDataCache:
         # 趋势信号表索引
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_symbol_date ON trend_signals(symbol, date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_signals_type ON trend_signals(signal_type)')
+        
+        # 交易日历表索引
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_trade_date ON trading_calendar(trade_date)')
         
         # 数据库升级：为现有的 stock_data 表添加 daily_change_pct 列（如果不存在）
         try:
@@ -664,6 +676,120 @@ class StockDataCache:
             df['date'] = pd.to_datetime(df['date'])
         
         return df
+    
+    def save_trading_calendar(self, trading_dates_df: pd.DataFrame):
+        """
+        保存交易日历数据到缓存
+        
+        Args:
+            trading_dates_df: 交易日历DataFrame (需包含trade_date列)
+        """
+        if trading_dates_df.empty:
+            return
+            
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        # 清除旧数据
+        cursor.execute('DELETE FROM trading_calendar')
+        
+        # 准备数据
+        data_to_insert = [
+            (row['trade_date'], datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            for _, row in trading_dates_df.iterrows()
+        ]
+        
+        # 批量插入
+        cursor.executemany('''
+            INSERT INTO trading_calendar (trade_date, created_at)
+            VALUES (?, ?)
+        ''', data_to_insert)
+        
+        conn.commit()
+        conn.close()
+        print(f"✅ 已缓存 {len(data_to_insert)} 个交易日")
+    
+    def is_trading_day(self, date_str: str) -> bool:
+        """
+        检查指定日期是否为交易日
+        
+        Args:
+            date_str: 日期字符串 (YYYY-MM-DD 或 YYYYMMDD 格式)
+            
+        Returns:
+            True if trading day, False otherwise
+        """
+        # 格式化日期字符串为 YYYY-MM-DD
+        if len(date_str) == 8:  # YYYYMMDD format
+            date_formatted = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
+        else:
+            date_formatted = date_str
+            
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('SELECT COUNT(*) FROM trading_calendar WHERE trade_date = ?', (date_formatted,))
+        result = cursor.fetchone()
+        conn.close()
+        
+        return result[0] > 0 if result else False
+    
+    def get_last_trading_day(self, before_date: str = None) -> Optional[str]:
+        """
+        获取最近的交易日
+        
+        Args:
+            before_date: 在此日期之前查找 (YYYY-MM-DD格式)，如果为None则使用今天
+            
+        Returns:
+            最近的交易日字符串 (YYYY-MM-DD) 或 None
+        """
+        if before_date is None:
+            before_date = datetime.today().strftime('%Y-%m-%d')
+        
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        cursor.execute('''
+            SELECT trade_date FROM trading_calendar 
+            WHERE trade_date <= ? 
+            ORDER BY trade_date DESC 
+            LIMIT 1
+        ''', (before_date,))
+        
+        result = cursor.fetchone()
+        conn.close()
+        
+        return result[0] if result else None
+    
+    def is_trading_calendar_cache_valid(self) -> bool:
+        """
+        检查交易日历缓存是否有效（7天内更新的）
+        
+        Returns:
+            True if cache is valid, False otherwise
+        """
+        if not os.path.exists(self.db_path):
+            return False
+            
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute('SELECT MAX(created_at) FROM trading_calendar')
+            result = cursor.fetchone()
+            
+            if not result or not result[0]:
+                return False
+            
+            # 检查是否在7天内更新
+            last_update = datetime.strptime(result[0], '%Y-%m-%d %H:%M:%S')
+            return (datetime.now() - last_update).days < 7
+            
+        except Exception:
+            return False
+        finally:
+            conn.close()
     
     def optimize_database(self):
         """优化数据库性能"""

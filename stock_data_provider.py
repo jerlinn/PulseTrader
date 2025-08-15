@@ -7,7 +7,7 @@
 import akshare as ak
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Tuple
 from stock_cache import StockDataCache
 
 
@@ -23,6 +23,7 @@ class StockDataProvider:
         """
         self.cache_manager = StockDataCache(cache_dir)
         self._stock_info_cache = None  # 股票信息缓存
+        self._trading_calendar_cache = None  # 交易日历缓存
         
         # 周期映射
         self.period_mapping = {
@@ -31,6 +32,9 @@ class StockDataProvider:
             '1季度': 90,
             '1月': 30
         }
+        
+        # 初始化交易日历
+        self._init_trading_calendar()
     
     def get_stock_data(self, stock_symbol: str, stock_name: str, period: str = '1年') -> pd.DataFrame:
         """
@@ -50,14 +54,19 @@ class StockDataProvider:
         
         print(f"📊 获取股票数据: {stock_name} ({period})")
         
-        # 检查是否需要更新数据
-        need_update, last_cached_date = self.cache_manager.needs_update(stock_symbol)
+        # 检查是否需要更新数据（基于交易日历）
+        need_update, last_cached_date = self._needs_update_with_trading_calendar(stock_symbol)
         
         # 先尝试从缓存获取数据
         cached_df = self.cache_manager.get_cached_data(stock_symbol, stock_name, start_date, today)
         
         if not cached_df.empty and not need_update:
-            print(f"🎯 使用缓存数据，无需更新")
+            # 检查今天是否为交易日，如果不是，提供更友好的提示
+            today_str = datetime.today().strftime('%Y-%m-%d')
+            if not self.is_trading_day(today_str):
+                print(f"📅 今日非交易日，使用最新缓存数据")
+            else:
+                print(f"🎯 使用缓存数据，无需更新")
             return cached_df
         
         # 需要从API获取数据
@@ -175,6 +184,60 @@ class StockDataProvider:
     def clear_cache(self, symbol: str = None):
         """清除缓存数据"""
         self.cache_manager.clear_cache(symbol)
+    
+    def _init_trading_calendar(self):
+        """初始化交易日历"""
+        try:
+            # 检查交易日历缓存是否有效
+            if not self.cache_manager.is_trading_calendar_cache_valid():
+                print("🗓️ 更新交易日历数据...")
+                trading_dates = ak.tool_trade_date_hist_sina()
+                self.cache_manager.save_trading_calendar(trading_dates)
+                print("✅ 交易日历数据更新完成")
+            else:
+                print("📅 交易日历缓存有效，无需更新")
+        except Exception as e:
+            print(f"⚠️ 交易日历初始化失败: {e}")
+    
+    def is_trading_day(self, date_str: str) -> bool:
+        """检查指定日期是否为交易日"""
+        return self.cache_manager.is_trading_day(date_str)
+    
+    def get_last_trading_day(self, before_date: str = None) -> Optional[str]:
+        """获取最近的交易日"""
+        return self.cache_manager.get_last_trading_day(before_date)
+    
+    def _needs_update_with_trading_calendar(self, symbol: str) -> Tuple[bool, Optional[str]]:
+        """
+        检查是否需要更新数据（基于交易日历）
+        
+        Args:
+            symbol: 股票代码
+            
+        Returns:
+            (是否需要更新, 最后缓存日期)
+        """
+        last_date = self.cache_manager.get_last_cached_date(symbol)
+        if not last_date:
+            return True, None
+        
+        # 获取最近的交易日
+        today_str = datetime.today().strftime('%Y-%m-%d')
+        last_trading_day = self.get_last_trading_day(today_str)
+        
+        if not last_trading_day:
+            # 如果无法获取交易日历，回退到原逻辑
+            today_obj = datetime.today()
+            if today_obj.weekday() < 5:  # 工作日
+                last_date_obj = datetime.strptime(last_date, '%Y%m%d')
+                return last_date_obj.date() < today_obj.date(), last_date
+            return False, last_date
+        
+        # 转换最近交易日格式
+        last_trading_day_formatted = last_trading_day.replace('-', '')
+        
+        # 如果缓存的最后日期早于最近交易日，则需要更新
+        return last_date < last_trading_day_formatted, last_date
     
     def optimize_cache(self):
         """优化缓存数据库"""

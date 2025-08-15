@@ -23,6 +23,7 @@
 ## LLM
 - Primary provider: Aihubmix
 - Retrieve key from system environment variables; hardcoding is prohibited
+- 始终保持 stream mode
 
 ## Project Strcture
 TrendSight/

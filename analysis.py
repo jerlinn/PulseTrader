@@ -6,14 +6,21 @@ import io
 import json
 from datetime import datetime
 import re
+import sys
+import argparse
 from indicators_storage import IndicatorsStorage
 
 # ========== Configuration ==========
 
-CHART_IMAGE_PATH = 'figures/杭钢股份_TrendSight_20250813.png'
+CHART_IMAGE_PATH = 'figures/杭钢股份_TrendSight_20250816.png'
 SHOW_REASONING_IN_TERMINAL = True  # False 可隐藏推理过程
 USE_COLORED_OUTPUT = True  # False 可禁用彩色输出
 BUFFER_REASONING_CHUNKS = True  # 缓存推理片段
+
+# 全局变量用于推理过程显示
+reasoning_buffer = []
+reasoning_display_buffer = ""
+reasoning_started = False
 
 def resize_image(image_path, max_size=512):
     """预处理最大边到指定尺寸"""
@@ -222,25 +229,26 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
         # 使用相对路径，从 reports 目录指向 figures 目录
         relative_image_path = f"../{chart_image_path}"
         chart_section = f"""
-## 股票走势图
+## 走势脉络图
 
 ![{stock_symbol or "股票"}走势图]({relative_image_path})
 
 """
     
     # 构建 MD 文档内容
-    md_content = f"""# 股票分析报告 · {stock_symbol or "未指定"}
+    md_content = f"""# 📊 交易诊断书 · {stock_symbol or "未指定"}
 
 **生成时间**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}  
 
 {chart_section}{indicators_section}
-## AI 分析结果
+## 策略研判
 
 {formatted_content}
 
 ---
 
-*本报告由 TrendSight AI 自动生成，技术指标数据已持久化存储*
+TrendSight：计算你的计划。
+
 """
     
     # 保存文件
@@ -251,7 +259,7 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
     return filepath
 
 def get_technical_indicators_context(chart_image_path):
-    """从图片路径推断股票并获取技术指标上下文"""
+    """从图片路径推断股票并获取技术指标上下文，在后续的 all-in-one 合入中，不再计算技术指标，直接从上一节点传递"""
     if not chart_image_path or not os.path.exists(chart_image_path):
         return ""
     
@@ -311,8 +319,7 @@ def get_technical_indicators_context(chart_image_path):
 RSI14: {current['rsi14']}
 MA10: {current['ma10']}
 日涨幅: {daily_change_text}
-趋势上轨: {upper_band}
-趋势下轨: {lower_band}
+{'SuperTrend 阻力位' if trend_status == '下降趋势' else 'SuperTrend 支撑位'}: {upper_band if trend_status == '下降趋势' else lower_band}
 趋势状态: {trend_status}
 今日趋势信号：{today_signal_text}"""
             
@@ -327,6 +334,19 @@ MA10: {current['ma10']}
     
     return ""
 
+def build_user_message(chart_image_path, user_context=None):
+    technical_context = get_technical_indicators_context(chart_image_path)
+
+    base_message = "分析当前的股票走势，提供投资建议"
+    
+    # 如果有用户提供的上下文，则整合到消息中
+    if user_context and user_context.strip():
+        user_message = f"{technical_context}用户补充信息：{user_context.strip()}\n\n{base_message}"
+    else:
+        user_message = f"{technical_context}{base_message}"
+    
+    return user_message
+
 client = OpenAI(
     api_key=os.getenv("AIHUBMIX_API_KEY"),
     base_url="https://aihubmix.com/v1"
@@ -340,41 +360,6 @@ def load_system_prompt():
         print("警告：找不到 analyst_prompt.md 文件，使用默认提示")
         return "你是专业的股票分析师，请分析股票走势并提供投资建议。"
 
-# 获取技术指标上下文
-technical_context = get_technical_indicators_context(CHART_IMAGE_PATH)
-
-response = client.responses.create(
-    model="gpt-5", # gpt-5, gpt-5-chat-latest, gpt-5-mini, gpt-5-nano
-    tools=[
-        {
-            "type": "code_interpreter",
-            "container": {"type": "auto"}
-        }
-    ],
-    input=[
-        {
-            "role": "system",
-            "content": [
-                { "type": "input_text", "text": load_system_prompt() }
-            ]
-        },
-        {
-            "role": "user",
-            "content": [
-                { "type": "input_text", "text": f"{technical_context}分析当前的股票走势，提供投资建议" },
-                {
-                    "type": "input_image",
-                    "image_url": f"data:image/png;base64,{encode_image(CHART_IMAGE_PATH)}",
-                    "detail": "low"
-                }
-            ]
-        }
-    ],
-    reasoning={ "effort": "high", "summary": "auto" }, # "low", "medium"(default), "high"
-    text={"verbosity": "medium"}, # "low", "medium"(default), "high"
-    stream=True
-)
-
 # ANSI 颜色代码
 class Colors:
     BLUE = '\033[94m' if USE_COLORED_OUTPUT else ''
@@ -384,16 +369,91 @@ class Colors:
     ENDC = '\033[0m' if USE_COLORED_OUTPUT else ''
     BOLD = '\033[1m' if USE_COLORED_OUTPUT else ''
 
-# 推理内容缓冲区
-reasoning_buffer = []
-reasoning_display_buffer = ""
-reasoning_started = False
-
-# 收集所有响应事件并实时显示内容
-response_events = []
-print(f"{Colors.BOLD}🤖 AI 分析中...{Colors.ENDC}")
-if SHOW_REASONING_IN_TERMINAL:
-    print(f"{Colors.YELLOW}📝 (包含推理过程){Colors.ENDC}")
+def process_response_stream(response):
+    """处理响应流并显示内容"""
+    # 推理内容缓冲区 - 使用全局变量
+    global reasoning_display_buffer, reasoning_started
+    reasoning_display_buffer = ""
+    reasoning_started = False
+    
+    # 收集所有响应事件并实时显示内容
+    response_events = []
+    print(f"{Colors.BOLD}🤖 AI 分析中...{Colors.ENDC}")
+    if SHOW_REASONING_IN_TERMINAL:
+        print(f"{Colors.YELLOW}📝 (包含推理过程){Colors.ENDC}")
+    
+    def process_reasoning_content(content):
+        """处理推理内容，按句子单位显示"""
+        global reasoning_display_buffer, reasoning_started
+        
+        reasoning_display_buffer += content
+        
+        # 检查是否有完整的句子
+        sentences = []
+        remaining_text = reasoning_display_buffer
+        
+        # 按句子分割（支持中英文标点）
+        sentence_endings = ['. ', '。', '! ', '！', '? ', '？', '\n']
+        
+        for ending in sentence_endings:
+            if ending in remaining_text:
+                parts = remaining_text.split(ending)
+                # 除了最后一部分，其他都是完整句子
+                for part in parts[:-1]:
+                    sentence = part + ending.strip()
+                    if sentence.strip():
+                        sentences.append(sentence.strip())
+                
+                # 更新剩余文本
+                remaining_text = parts[-1]
+                break
+        
+        # 显示完整句子
+        for sentence in sentences:
+            if not reasoning_started:
+                print(f"\n\n{Colors.BLUE}🧠 [推理过程]:{Colors.ENDC}")
+                reasoning_started = True
+            
+            print(f"{Colors.BLUE}{sentence}{Colors.ENDC}")
+        
+        # 更新缓冲区为剩余文本
+        reasoning_display_buffer = remaining_text
+    
+    def finish_reasoning_display():
+        """完成推理显示，输出剩余内容"""
+        global reasoning_display_buffer, reasoning_started
+        
+        if reasoning_display_buffer.strip():
+            if not reasoning_started:
+                print(f"\n\n{Colors.BLUE}🧠 [推理过程]:{Colors.ENDC}")
+                print(f"{Colors.BLUE}{'-' * 30}{Colors.ENDC}")
+            
+            print(f"{Colors.BLUE}{reasoning_display_buffer.strip()}{Colors.ENDC}")
+        
+        if reasoning_started:
+            print(f"{Colors.BLUE}{'-' * 30}{Colors.ENDC}")
+        
+        reasoning_display_buffer = ""
+        reasoning_started = False
+    
+    for event in response:
+        response_events.append(event)
+        
+        # 解析并显示可读内容
+        parsed = parse_event_content(event)
+        if parsed and parsed.get('content') and parsed['content'].strip():
+            if parsed['type'] == 'text':
+                print(f"{Colors.GREEN}{parsed['content']}{Colors.ENDC}", end='', flush=True)
+            elif parsed['type'] == 'reasoning' and SHOW_REASONING_IN_TERMINAL:
+                process_reasoning_content(parsed['content'])
+    
+    # 完成推理显示
+    if SHOW_REASONING_IN_TERMINAL:
+        finish_reasoning_display()
+    
+    print(f"\n{Colors.BOLD}" + "-" * 30 + f"{Colors.ENDC}")
+    
+    return response_events
 
 def process_reasoning_content(content):
     """处理推理内容，按句子单位显示"""
@@ -449,36 +509,166 @@ def finish_reasoning_display():
     reasoning_display_buffer = ""
     reasoning_started = False
 
-for event in response:
-    response_events.append(event)
+def get_user_context_input():
+    """获取用户输入的分析上下文"""
+    print(f"\n{Colors.YELLOW}💡 可选：提供额外的分析上下文{Colors.ENDC}")
+    print("   例如：「我关注短期波动风险」、「重点分析基本面」、「评估长期投资价值」等")
+    print("   如不需要额外信息，直接按 Enter 跳过")
     
-    # 解析并显示可读内容
-    parsed = parse_event_content(event)
-    if parsed and parsed.get('content') and parsed['content'].strip():
-        if parsed['type'] == 'text':
-            print(f"{Colors.GREEN}{parsed['content']}{Colors.ENDC}", end='', flush=True)
-        elif parsed['type'] == 'reasoning' and SHOW_REASONING_IN_TERMINAL:
-            process_reasoning_content(parsed['content'])
+    try:
+        user_input = input(f"\n{Colors.BLUE}🔍 请输入分析重点或问题（可选）: {Colors.ENDC}").strip()
+        return user_input if user_input else None
+    except (KeyboardInterrupt, EOFError):
+        print(f"\n{Colors.YELLOW}已跳过用户输入{Colors.ENDC}")
+        return None
 
-# 完成推理显示
-if SHOW_REASONING_IN_TERMINAL:
-    finish_reasoning_display()
+def run_analysis(chart_image_path=None, user_context=None):
+    """运行股票分析，支持可选的用户上下文输入"""
+    if chart_image_path is None:
+        chart_image_path = CHART_IMAGE_PATH
+    
+    # 技术指标上下文获取
+    technical_context = get_technical_indicators_context(chart_image_path)
+    
+    # 构建用户消息
+    if user_context and user_context.strip():
+        user_message = f"{technical_context}用户补充信息：{user_context.strip()}\n\n分析当前的股票走势，提供投资建议"
+    else:
+        user_message = f"{technical_context}分析当前的股票走势，提供投资建议"
+    
+    response = client.responses.create(
+        model="gpt-5", # gpt-5, gpt-5-chat-latest, gpt-5-mini, gpt-5-nano
+        tools=[
+            {
+                "type": "code_interpreter",
+                "container": {"type": "auto"}
+            }
+        ],
+        input=[
+            {
+                "role": "system",
+                "content": [
+                    { "type": "input_text", "text": load_system_prompt() }
+                ]
+            },
+            {
+                "role": "user",
+                "content": [
+                    { "type": "input_text", "text": user_message },
+                    {
+                        "type": "input_image",
+                        "image_url": f"data:image/png;base64,{encode_image(chart_image_path)}",
+                        "detail": "low"
+                    }
+                ]
+            }
+        ],
+        reasoning={ "effort": "medium", "summary": "auto" }, # "low", "medium"(default), "high"
+        text={"verbosity": "low"}, # "low", "medium"(default), "high"，维持用 low 测试
+        stream=True
+    )
+    
+    # 事件处理 - 添加网络错误处理
+    response_events = []
+    print(f"{Colors.BOLD}🤖 AI 分析中...{Colors.ENDC}")
+    if SHOW_REASONING_IN_TERMINAL:
+        print(f"{Colors.YELLOW}📝 (包含推理过程){Colors.ENDC}")
 
-print(f"\n{Colors.BOLD}" + "-" * 30 + f"{Colors.ENDC}")
+    try:
+        for event in response:
+            response_events.append(event)
+            
+            # 恢复事件解析，但添加错误处理避免卡住
+            try:
+                parsed = parse_event_content(event)
+                if parsed and parsed.get('content') and parsed['content'].strip():
+                    if parsed['type'] == 'text':
+                        print(f"{Colors.GREEN}{parsed['content']}{Colors.ENDC}", end='', flush=True)
+                    elif parsed['type'] == 'reasoning' and SHOW_REASONING_IN_TERMINAL:
+                        process_reasoning_content(parsed['content'])
+                else:
+                    print(".", end='', flush=True)  # 未解析到内容时显示进度点
+            except Exception:
+                # 如果解析出错，显示进度点并继续
+                print(".", end='', flush=True)
+    
+    except Exception as e:
+        # 处理网络连接错误
+        error_msg = str(e)
+        if 'RemoteProtocolError' in error_msg or 'incomplete chunked read' in error_msg:
+            print(f"\n{Colors.YELLOW}⚠️  网络连接中断，但已接收到部分响应{Colors.ENDC}")
+        else:
+            print(f"\n{Colors.RED}❌ 流处理错误: {error_msg}{Colors.ENDC}")
+        
+        # 如果已经收集到一些事件，继续处理
+        if response_events:
+            print(f"{Colors.YELLOW}📄 处理已接收的部分内容...{Colors.ENDC}")
 
-# 配置已在文件顶部定义
+    # 完成推理显示
+    if SHOW_REASONING_IN_TERMINAL:
+        try:
+            finish_reasoning_display()
+        except Exception:
+            pass  # 如果推理显示出错，忽略并继续
 
-# 提取内容并保存报告
-extracted_content = extract_content_from_response(response_events)
+    print(f"\n{Colors.BOLD}" + "-" * 30 + f"{Colors.ENDC}")
+    
+    # 提取内容并保存报告
+    extracted_content = extract_content_from_response(response_events)
+    
+    # 从图表路径自动提取股票名称
+    stock_symbol = extract_stock_symbol_from_path(chart_image_path)
+    print(f"📈 检测到股票: {stock_symbol}")
+    
+    report_path = save_analysis_report(
+        extracted_content, 
+        stock_symbol=stock_symbol, 
+        chart_image_path=chart_image_path
+    )
+    
+    print(f"\n{Colors.GREEN}🎉 分析完成！报告已保存至: {Colors.BLUE}{report_path}{Colors.ENDC}")
+    
+    return response, chart_image_path
 
-# 从图表路径自动提取股票名称
-stock_symbol = extract_stock_symbol_from_path(CHART_IMAGE_PATH)
-print(f"📈 检测到股票: {stock_symbol}")
+def parse_arguments():
+    """解析命令行参数"""
+    parser = argparse.ArgumentParser(description='TrendSight 股票分析工具')
+    parser.add_argument('--interactive', '-i', action='store_true', 
+                       help='启用交互式模式，允许用户输入分析上下文')
+    parser.add_argument('--context', '-c', type=str, 
+                       help='直接提供分析上下文，跳过交互输入')
+    parser.add_argument('--chart', type=str, default=CHART_IMAGE_PATH,
+                       help='指定图表文件路径')
+    return parser.parse_args()
 
-report_path = save_analysis_report(
-    extracted_content, 
-    stock_symbol=stock_symbol, 
-    chart_image_path=CHART_IMAGE_PATH
-)
+def main():
+    """主函数，处理命令行参数和用户交互"""
+    args = parse_arguments()
+    
+    user_context = None
+    
+    # 处理用户上下文输入
+    if args.context:
+        # 直接使用命令行提供的上下文
+        user_context = args.context
+        print(f"{Colors.GREEN}📝 使用提供的分析上下文: {user_context}{Colors.ENDC}")
+    elif args.interactive:
+        # 交互式输入
+        user_context = get_user_context_input()
+        if user_context:
+            print(f"{Colors.GREEN}📝 用户上下文已记录: {user_context}{Colors.ENDC}")
+    
+    # 运行分析
+    response, used_chart_path = run_analysis(
+        chart_image_path=args.chart, 
+        user_context=user_context
+    )
+    
+    return response, used_chart_path
 
-print(f"\n{Colors.GREEN}🎉 分析完成！报告已保存至: {Colors.BLUE}{report_path}{Colors.ENDC}")
+if __name__ == "__main__":
+    # 如果作为脚本直接运行，使用主函数
+    response, used_chart_path = main()
+else:
+    # 如果作为模块导入，使用原有的默认行为
+    response, used_chart_path = run_analysis(user_context=None)
