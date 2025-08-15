@@ -32,8 +32,8 @@ def create_stock_chart(df, stock_name, divergences, today):
     fig.add_trace(go.Bar(x=trading_df['日期'], y=trading_df['成交量'], marker_color=trading_df['Color'], opacity=0.8, name='交易量'), row=2, col=1)
 
     # 添加超级趋势上轨线和下轨线
-    fig.add_trace(go.Scatter(x=df['日期'], y=df['upper_band'], mode='lines', name='上轨', line=dict(color='green', shape='spline', dash='dot')), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df['日期'], y=df['lower_band'], mode='lines', name='下轨', line=dict(color='orangered', shape='spline', dash='dot')), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df['日期'], y=df['upper_band'], mode='lines', name='压力', line=dict(color='green', shape='spline', dash='dot')), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df['日期'], y=df['lower_band'], mode='lines', name='支撑', line=dict(color='orangered', shape='spline', dash='dot')), row=1, col=1)
 
     # 添加MA10线
     _add_ma10_line(fig, df)

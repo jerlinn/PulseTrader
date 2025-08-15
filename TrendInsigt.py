@@ -148,7 +148,7 @@ def main():
             user_input = input(f"\n请输入股票名称 (回车默认'{default_stock}', 按 'q' 退出): ").strip()
             
             if user_input.lower() in ['q', '0']:
-                print("感谢使用 TrendSight")
+                print("See you next time.")
                 break
             
             # 确定要分析的股票
