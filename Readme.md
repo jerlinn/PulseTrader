@@ -38,7 +38,7 @@ TrendSight 采用**分离式架构设计**，确保计算的绝对精确性和 A
 ```mermaid
 graph TD
     %% 用户交互层 - 圆角矩形
-    USER([用户输入股票名称]) --> APP([应用层<br/>TrendInsigt.py])
+    USER([输入股票名称]) --> APP([应用层<br/>TrendInsigt.py])
     
     %% 数据处理层 - 矩形
     APP --> DATA[数据层<br/>stock_data_provider]
@@ -123,6 +123,7 @@ erDiagram
         real close_price
         integer volume
         datetime updated_at
+        real daily_change_pct
     }
     
     technical_indicators {
@@ -289,18 +290,14 @@ TrendSight/
 ## Todo
 - [x] 组件化
 - [x] 对接 LLM
-  - [x] 基础 prompt 设计
+  - [x] system prompt
+  - [ ] 补充到缓存边界，高效利用 752 → 1024 Tokens
   - [x] 计算的部分使用代码解析器
   - [x] 图片读取
   - [x] 把 response 对象中的目标内容提取为 md 文档到 reports 目录
-  - [x] 把传入的股票图表 encode_image，放到 report 文档，作为头部贴图
+  - [x] 把传入的股票图表 encode_image，放到 report 文档，作为头图
   
 - [x] 数据结构优化，实现数据持久化机制
-  - [x] SQLite 统一数据库架构设计
-  - [x] 技术指标数据表结构设计（RSI14、MA10、趋势上下轨）
-  - [x] RSI背离信号存储（类型、时间框架、置信度）
-  - [x] 趋势变化信号存储（买入/卖出点）
-  - [x] 智能缓存机制，避免重复计算
 - [x] 用于进一步分析的数据结构设计，增加输出模块，存储 csv
   - [x] indicators_query.py 数据查询工具
   - [x] CSV 导出功能（`python indicators_query.py 股票名称 --export`）
@@ -308,12 +305,8 @@ TrendSight/
 - [x] 数据交互设计优化：股票名称 → 数据和图表 → LLM → 报告
   - [x] 终端交互优化，实时显示技术指标摘要
   - [x] 重要数据指标传入 user message
-  - [x] AI 分析报告自动包含技术指标数据
-  - [x] 流式输出和彩色终端支持
-
-- [ ] 补充日涨幅（今日收盘/昨日收盘）的计算、存储和传递 📍
-- [ ] 大幅简化报告，提升可操作性和易读性 📍
-- [ ] 完整 system prompt
+- [x] 大幅简化报告，提升可操作性和易读性
+- [ ] 分析时可以传入用户的其他上下文，如具体的问题或额外信息
 - [ ] All-in-one 脚本
 - [ ] 补充贡献指南
 

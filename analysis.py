@@ -370,7 +370,7 @@ response = client.responses.create(
             ]
         }
     ],
-    reasoning={ "effort": "medium", "summary": "auto" }, # "low", "medium"(default), "high"
+    reasoning={ "effort": "high", "summary": "auto" }, # "low", "medium"(default), "high"
     text={"verbosity": "medium"}, # "low", "medium"(default), "high"
     stream=True
 )
