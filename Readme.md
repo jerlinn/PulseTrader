@@ -135,6 +135,8 @@ erDiagram
         integer trend
         real upper_band
         real lower_band
+        real volume
+        real vol_ratio
     }
     
     rsi_divergences {
@@ -316,7 +318,7 @@ TrendSight/
   - [x] 添加交易日历数据库表和缓存机制
   - [x] 优化数据更新逻辑，避免周末等非交易日的无效请求
   - [x] 提供友好的非交易日提示信息
-- [ ] 数据传递：补充交易量的存储和传递
+- [x] 数据传递：补充交易量和量比的存储和传递
 
 - [x] 对于除权除息日这种边缘情况，用XD前缀去匹配
 - [ ] All-in-one 脚本

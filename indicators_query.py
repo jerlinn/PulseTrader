@@ -26,12 +26,13 @@ def format_indicators_display(indicators_summary):
     print("\n📈 核心技术指标:")
     print(f"  • RSI14: {current['rsi14']} {'🔴 超买' if current['rsi14'] and current['rsi14'] > 70 else '🟢 超卖' if current['rsi14'] and current['rsi14'] < 30 else '⚪ 中性'}")
     print(f"  • MA10: {current['ma10']}")
-    print(f"  • 趋势上轨: {current['trend_upper']}")
-    print(f"  • 趋势下轨: {current['trend_lower']}")
-    print(f"  • SuperTrend: {current['supertrend_value']}")
+    print(f"  • 趋势上轨: {current['upper_band']}")
+    print(f"  • 趋势下轨: {current['lower_band']}")
+    print(f"  • 成交量: {current['volume']}")
+    print(f"  • 量比: {current['vol_ratio']}")
     
-    trend_emoji = "🚀" if current['trend_status'] == 1 else "📉" if current['trend_status'] == -1 else "➡️"
-    trend_text = "上升趋势" if current['trend_status'] == 1 else "下降趋势" if current['trend_status'] == -1 else "横盘整理"
+    trend_emoji = "🚀" if current['trend'] == 1 else "📉" if current['trend'] == -1 else "➡️"
+    trend_text = "上升趋势" if current['trend'] == 1 else "下降趋势" if current['trend'] == -1 else "横盘整理"
     print(f"  • 趋势状态: {trend_emoji} {trend_text}")
     
     # 显示背离信号

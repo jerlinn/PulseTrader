@@ -199,6 +199,8 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
 - **RSI14**: {current['rsi14']}
 - **MA10**: {current['ma10']}
 - **日涨幅**: {f"{current['daily_change_pct']:.2f}%" if current.get('daily_change_pct') is not None else "无数据"}
+- **成交量**: {f"{current['volume']:.0f}" if current.get('volume') is not None else "无数据"}
+- **量比**: {f"{current['vol_ratio']:.2f}" if current.get('vol_ratio') is not None else "无数据"}
 - **趋势上轨**: {current['upper_band']}
 - **趋势下轨**: {current['lower_band']}
 - **趋势状态**: {"上升" if current['trend'] == 1 else "下降" if current['trend'] == -1 else "中性"}
@@ -313,12 +315,20 @@ def get_technical_indicators_context(chart_image_path):
             daily_change = current.get('daily_change_pct', None)
             daily_change_text = f"{daily_change:.2f}%" if daily_change is not None else "None"
             
+            # 格式化成交量和量比
+            volume = current.get('volume', None)
+            volume_text = f"{volume:.0f}" if volume is not None else "None"
+            vol_ratio = current.get('vol_ratio', None)
+            vol_ratio_text = f"{vol_ratio:.2f}" if vol_ratio is not None else "None"
+            
             context = f"""技术指标背景数据：
 
 📊 {stock_name} · {current['date']} 技术指标：
 RSI14: {current['rsi14']}
 MA10: {current['ma10']}
 日涨幅: {daily_change_text}
+成交量: {volume_text}
+量比: {vol_ratio_text}
 {'SuperTrend 阻力位' if trend_status == '下降趋势' else 'SuperTrend 支撑位'}: {upper_band if trend_status == '下降趋势' else lower_band}
 趋势状态: {trend_status}
 今日趋势信号：{today_signal_text}"""

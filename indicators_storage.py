@@ -18,7 +18,9 @@ class TechnicalIndicators:
     upper_band: Optional[float] = None  # SuperTrend 上轨
     lower_band: Optional[float] = None  # SuperTrend 下轨
     trend: Optional[int] = None  # 趋势方向：1=上涨, -1=下跌, 0=中性
-    supertrend_value: Optional[float] = None  # 当前 SuperTrend 值
+    # 成交量相关指标
+    volume: Optional[float] = None  # 当日成交量
+    vol_ratio: Optional[float] = None  # 量比（当日成交量/过去5日平均成交量）
 
 
 @dataclass
@@ -105,6 +107,9 @@ class IndicatorsStorage:
         # 计算 MA10
         df['ma10'] = df['收盘'].rolling(window=10).mean()
         
+        # 计算量比（当日成交量/过去5日平均成交量）
+        df['vol_ratio'] = df['成交量'] / df['成交量'].rolling(window=5).mean()
+        
         # 处理日涨幅数据：优先使用 akshare 的涨跌幅，否则计算
         if '涨跌幅' in df.columns:
             df['日涨幅'] = df['涨跌幅']  # 直接使用 akshare 的涨跌幅字段
@@ -115,7 +120,7 @@ class IndicatorsStorage:
         indicators_list = []
         rsi_values = []
         
-        for i, row in df.iterrows():
+        for _, row in df.iterrows():
             date_str = row['日期'].strftime('%Y-%m-%d') if hasattr(row['日期'], 'strftime') else str(row['日期'])
             
             # 安全地获取列值，如果列不存在则使用默认值
@@ -147,7 +152,8 @@ class IndicatorsStorage:
                 upper_band=safe_float(safe_get('upper_band')),
                 lower_band=safe_float(safe_get('lower_band')),
                 trend=safe_int(safe_get('trend', 0)),
-                supertrend_value=safe_float(safe_get('super_trend'))
+                volume=safe_float(safe_get('成交量')),
+                vol_ratio=safe_float(safe_get('vol_ratio'), 2)
             )
             
             indicators_list.append(indicator)
@@ -160,7 +166,7 @@ class IndicatorsStorage:
         }
     
     def _calculate_rsi_divergences(self, df: pd.DataFrame, rsi: pd.Series) -> List[RSIDivergence]:
-        """计算RSI背离信号"""
+        """计算 RSI 背离信号"""
         divergences_df = detect_rsi_divergence(df, rsi)
         
         divergences_list = []
@@ -230,12 +236,12 @@ class IndicatorsStorage:
         return self.cache.get_latest_indicators(stock_name)
     
     def export_to_dataframe(self, stock_name: str) -> Optional[pd.DataFrame]:
-        """将指标数据导出为DataFrame"""
+        """将指标数据导出为 DataFrame"""
         return self.cache.get_indicators_dataframe(stock_name)
 
 
 def enhance_analysis_with_indicators(df: pd.DataFrame, stock_name: str, symbol: str = None) -> Dict[str, Any]:
-    """为analysis.py提供的便捷函数：计算并返回增强的指标数据"""
+    """为 analysis.py 提供的便捷函数：计算并返回增强的指标数据"""
     storage = IndicatorsStorage()
     result = storage.calculate_and_store_indicators(df, stock_name, symbol)
     
