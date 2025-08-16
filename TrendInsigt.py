@@ -124,7 +124,7 @@ def analyze_stock(stock_name, period='1年'):
 def main():
     """主函数 - 交互式股票分析"""
     print("=" * 50)
-    print("         TrendSight @eviljer")
+    print("         PulseTrader @eviljer")
     print("=" * 50)
     
     # 显示缓存状态

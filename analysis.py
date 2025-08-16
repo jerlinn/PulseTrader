@@ -13,7 +13,7 @@ from indicators_storage import IndicatorsStorage
 # 无特别信号时简洁分析
 
 # ========== Configuration ==========
-CHART_IMAGE_PATH = 'figures/杭钢股份_TrendSight_20250816.png'
+CHART_IMAGE_PATH = 'figures/杭钢股份_PulseTrader_20250816.png'
 SHOW_REASONING_IN_TERMINAL = True  # False 可隐藏推理过程
 USE_COLORED_OUTPUT = True  # False 可禁用彩色输出
 BUFFER_REASONING_CHUNKS = True  # 缓存推理片段
@@ -208,7 +208,7 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
 
 ---
 
-TrendSight：计算你的计划。
+PulseTrader：计算你的计划。
 
 """
     
@@ -601,7 +601,7 @@ def run_analysis(chart_image_path=None, user_context=None):
 
 def parse_arguments():
     """解析命令行参数"""
-    parser = argparse.ArgumentParser(description='TrendSight 股票分析工具')
+    parser = argparse.ArgumentParser(description='PulseTrader 股票分析工具')
     parser.add_argument('--interactive', '-i', action='store_true', 
                        help='启用交互式模式，允许用户输入分析上下文')
     parser.add_argument('--context', '-c', type=str, 

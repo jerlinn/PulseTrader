@@ -1,6 +1,6 @@
 # 贡献指南
 
-感谢你对 TrendSight 的关注！我们欢迎所有形式的贡献，包括但不限于：
+感谢你对 PulseTrader 的关注！我们欢迎所有形式的贡献，包括但不限于：
 
 - 🐛 报告 bug
 - 💡 提出功能建议
@@ -18,8 +18,8 @@
 ### 安装开发依赖
 
 ```bash
-git clone https://github.com/yourusername/TrendSight.git
-cd TrendSight
+git clone https://github.com/jerlinn/PulseTrader.git
+cd PulseTrader
 pip install -r requirements.txt
 ```
 
@@ -39,7 +39,7 @@ source ~/.zshrc
 
 ### 报告问题
 
-使用 [GitHub Issues](https://github.com/yourusername/TrendSight/issues) 报告问题时，请包含：
+使用 [GitHub Issues](https://github.com/yourusername/PulseTrader/issues) 报告问题时，请包含：
 
 - **问题描述**：清晰描述遇到的问题
 - **复现步骤**：详细的操作步骤
@@ -127,7 +127,7 @@ Closes #123
 ## 项目结构
 
 ```
-TrendSight/
+PulseTrader/
 ├── TrendInsigt.py              # 主程序入口
 ├── analysis.py                 # AI 分析模块
 ├── plotting_component.py       # 绘图组件
@@ -181,9 +181,9 @@ print(f'数据量: {len(data)} 条')
 ## 获得帮助
 
 - 📖 查看 [README.md](README.md) 了解项目概况
-- 💬 在 [Issues](https://github.com/yourusername/TrendSight/issues) 中提问
-- 📧 发送邮件至 [your-email@example.com](mailto:your-email@example.com)
+- 💬 在 [Issues](https://github.com/jerlinn/PulseTrader/issues) 中提问
+- 📧 发送邮件至 [your-email@example.com](mailto:fancyexpro@gmail.com)
 
 ---
 
-再次感谢你的贡献！每一个 PR 和 Issue 都让 TrendSight 变得更好。🚀
+再次感谢你的贡献！每一个 PR 和 Issue 都让 PulseTrader 变得更好。🚀

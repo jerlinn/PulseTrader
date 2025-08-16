@@ -58,7 +58,7 @@ def create_stock_chart(df, stock_name, divergences, today):
         
     _update_layout(fig, df, stock_name)
 
-    fig_name = f'{output_directory}/{stock_name}_TrendSight_{today}.png'
+    fig_name = f'{output_directory}/{stock_name}_PulseTrader_{today}.png'
     fig.write_image(fig_name, scale=2)
     
     print(f"图表已保存至: {fig_name}")
@@ -196,7 +196,7 @@ def _update_layout(fig, df, stock_name):
     fig.update_layout(
         height=800, width=1080, 
         title={
-            'text': f'<b>TrendSight<b> · {stock_name}',
+            'text': f'<b>PulseTrader<b> · {stock_name}',
             'font': dict(family="SartSans-Regular", size=40, color="#222222")
         }, 
         title_x=0.475, 

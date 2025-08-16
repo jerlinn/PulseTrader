@@ -1,4 +1,4 @@
-# TrendSight - AI 增强的量化投资工具
+# PulseTrader - AI 增强的量化投资工具
 
 ## 🔥 重新定义 AI 量化投资的正确方向
 
@@ -31,7 +31,7 @@
 
 ## ⚖️ 精确计算与智能洞察的完美平衡
 
-TrendSight 采用**分离式架构设计**，确保计算的绝对精确性和 AI 辅助的智能化：
+PulseTrader 采用**分离式架构设计**，确保计算的绝对精确性和 AI 辅助的智能化：
 
 ### 核心技术架构
 
@@ -276,8 +276,8 @@ graph LR
 
 ```bash
 # 克隆仓库
-git clone https://github.com/your-repo/TrendSight.git
-cd TrendSight
+git clone https://github.com/your-repo/PulseTrader.git
+cd PulseTrader
 
 # 安装依赖
 pip install -r requirements.txt
@@ -315,13 +315,13 @@ python analysis.py --context "分析突破有效性，判断追涨时机"  # 突
 python analysis.py --context "从长期价值角度分析，适合定投吗"  # 长期投资
 
 # 指定图表分析
-python analysis.py --chart figures/股票名_TrendSight_日期.png --context "评估突破有效性"
+python analysis.py --chart figures/股票名_PulseTrader_日期.png --context "评估突破有效性"
 ```
 
 ## 📖 项目结构
 
 ```
-TrendSight/
+PulseTrader/
 ├── TrendInsigt.py              # 主程序入口（交互式股票分析）
 ├── analysis.py                 # AI 分析模块（GPT-5 集成）
 ├── plotting_component.py       # 绘图组件（对数坐标可视化）

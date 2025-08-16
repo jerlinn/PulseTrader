@@ -122,7 +122,7 @@ def list_available_stocks():
 def main():
     """主函数"""
     if len(sys.argv) < 2:
-        print("📊 TrendSight 技术指标查询工具")
+        print("📊 PulseTrader 技术指标查询工具")
         print("\n用法:")
         print("  python indicators_query.py <股票名称>     # 查看指定股票指标")
         print("  python indicators_query.py --list        # 列出所有可用股票")
