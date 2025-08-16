@@ -116,59 +116,82 @@ erDiagram
     stock_data ||--|| stock_info : code
     
     stock_data {
-        string symbol PK
-        string date PK
+        integer id PK
+        string symbol
+        string stock_name
+        string date
         real open_price
         real high_price  
         real low_price
         real close_price
         integer volume
-        datetime updated_at
         real daily_change_pct
+        datetime created_at
+        datetime updated_at
+        unique symbol_date "UNIQUE(symbol, date)"
     }
     
     technical_indicators {
-        string symbol PK
-        string date PK
+        integer id PK
+        string symbol
+        string stock_name
+        string date
         real rsi14
         real ma10
+        real daily_change_pct
         integer trend
         real upper_band
         real lower_band
         real volume
         real vol_ratio
+        datetime created_at
+        datetime updated_at
+        unique symbol_date "UNIQUE(symbol, date)"
     }
     
     rsi_divergences {
         integer id PK
         string symbol
+        string stock_name
         string date
+        string prev_date
         string type
         string timeframe
+        real rsi_change
+        real price_change
         real confidence
         real current_rsi
         real prev_rsi
+        real current_price
+        real prev_price
+        datetime created_at
     }
     
     trend_signals {
         integer id PK
         string symbol
+        string stock_name
         string date
         string signal_type
         real price
         real trend_value
+        datetime created_at
     }
     
     stock_info {
-        string code PK
+        integer id PK
+        string code
         string name
+        datetime created_at
         datetime updated_at
+        unique code "UNIQUE(code)"
     }
     
     trading_calendar {
         integer id PK
         string trade_date
         datetime created_at
+        unique trade_date "UNIQUE(trade_date)"
     }
 ```
 
@@ -187,9 +210,9 @@ graph LR
     COMPLEX([复杂的市场信息]) --> FILTER{过滤机制}
     
     %% 过滤分支 - 菱形决策节点
-    FILTER --> |基本面| NOISE1[/❌ 财报迷宫\]
-    FILTER --> |舆  情| NOISE2[/❌ 新闻噪音\] 
-    FILTER --> |量价关系| CORE([✅ 核心信号])
+    FILTER --> |基本面| NOISE1([财报迷宫])
+    FILTER --> |舆  情| NOISE2([新闻噪音])
+    FILTER --> |量价关系| CORE([核心信号])
     
     %% 核心分析层 - 六边形表示处理引擎
     CORE --> TREND{{趋势判断}}
@@ -236,7 +259,7 @@ graph LR
 ### 为普通投资者而设计
 - **极简交互**：输入股票名称即可开始分析，无需追踪复杂新闻和财报
 - **专业图表**：对数坐标系直观展现价格波动本质，摆脱信息噪音干扰
-- **人性量化**：RSI背离检测直接捕捉市场贪婪与恐惧的临界点
+- **人性量化**：RSI 背离检测直接捕捉市场贪婪与恐惧的临界点
 - **数学严谨**：严格阈值（顶背离 80，底背离 20/30）过滤 90% 情绪化假信号
 - **置信度量化**：每个信号都有明确的可靠性评分，避免盲目跟风
 

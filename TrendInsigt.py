@@ -140,7 +140,7 @@ def main():
         print(f"⚠️  预加载股票信息失败: {e}")
     
     # 默认股票
-    default_stock = "中国中车"
+    default_stock = "杭钢股份"
     
     while True:
         try:

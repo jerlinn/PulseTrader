@@ -82,11 +82,14 @@ class StockDataCache:
                 trend INTEGER DEFAULT 0,
                 upper_band REAL,
                 lower_band REAL,
+                volume REAL,
+                vol_ratio REAL,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(symbol, date)
             )
         ''')
+        
         
         # 创建RSI背离信号表
         cursor.execute('''
@@ -155,21 +158,6 @@ class StockDataCache:
         # 交易日历表索引
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_trade_date ON trading_calendar(trade_date)')
         
-        # 数据库升级：为现有的 stock_data 表添加 daily_change_pct 列（如果不存在）
-        try:
-            cursor.execute("ALTER TABLE stock_data ADD COLUMN daily_change_pct REAL")
-            print("✅ 已为 stock_data 表添加 daily_change_pct 列")
-        except sqlite3.OperationalError:
-            # 列已存在，忽略错误
-            pass
-            
-        # 数据库升级：为现有的 technical_indicators 表添加 daily_change_pct 列（如果不存在）
-        try:
-            cursor.execute("ALTER TABLE technical_indicators ADD COLUMN daily_change_pct REAL")
-            print("✅ 已为 technical_indicators 表添加 daily_change_pct 列")
-        except sqlite3.OperationalError:
-            # 列已存在，忽略错误
-            pass
         
         conn.commit()
         conn.close()
@@ -493,14 +481,16 @@ class StockDataCache:
                 indicator.trend,
                 indicator.upper_band,
                 indicator.lower_band,
+                indicator.volume,
+                indicator.vol_ratio,
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             ))
         
         # 使用REPLACE INTO处理重复数据
         cursor.executemany('''
             REPLACE INTO technical_indicators 
-            (symbol, stock_name, date, rsi14, ma10, daily_change_pct, trend, upper_band, lower_band, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (symbol, stock_name, date, rsi14, ma10, daily_change_pct, trend, upper_band, lower_band, volume, vol_ratio, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', data_to_insert)
         
         conn.commit()
