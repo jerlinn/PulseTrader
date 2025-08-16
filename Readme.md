@@ -273,6 +273,8 @@ graph LR
 
 ## 🚀 快速开始
 
+该项目的分析模块需要 AIHUBMIX API KEY，先到 [Aihubmix 官网申请](https://aihubmix.com/token)。
+
 ```bash
 # 克隆仓库
 git clone https://github.com/your-repo/PulseTrader.git
@@ -283,7 +285,7 @@ pip install -r requirements.txt
 
 # 配置系统环境变量
 例，在 ~/.zshrc 中加入
-export AIHUBMIX_API_KEY="your_api_key_here"
+export AIHUBMIX_API_KEY="在上面申请的密钥"
 
 运行指令使其生效
 source ~/.zshrc
