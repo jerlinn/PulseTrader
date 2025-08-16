@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 股票数据提供器组件
-整合缓存管理和API数据获取，提供统一的数据接口
+整合缓存管理和 API 数据获取，提供统一的数据接口
 """
 
 import akshare as ak
@@ -12,7 +12,7 @@ from stock_cache import StockDataCache
 
 
 class StockDataProvider:
-    """股票数据提供器，整合缓存和API获取"""
+    """股票数据提供器，整合缓存和 API 获取"""
     
     def __init__(self, cache_dir: str = "cache"):
         """
@@ -25,7 +25,6 @@ class StockDataProvider:
         self._stock_info_cache = None  # 股票信息缓存
         self._trading_calendar_cache = None  # 交易日历缓存
         
-        # 周期映射
         self.period_mapping = {
             '1年': 365,
             '半年': 180,
@@ -33,7 +32,6 @@ class StockDataProvider:
             '1月': 30
         }
         
-        # 初始化交易日历
         self._init_trading_calendar()
     
     def get_stock_data(self, stock_symbol: str, stock_name: str, period: str = '1年') -> pd.DataFrame:
@@ -46,7 +44,7 @@ class StockDataProvider:
             period: 时间周期 ('1年', '半年', '1季度', '1月')
             
         Returns:
-            包含股票数据的DataFrame
+            包含股票数据的 DataFrame
         """
         days = self.period_mapping.get(period, 365)
         start_date = (datetime.today() - timedelta(days=days)).strftime('%Y%m%d')
@@ -77,7 +75,7 @@ class StockDataProvider:
                 print(f"🎯 使用缓存数据，无需更新")
             return cached_df
         
-        # 需要从API获取数据
+        # 需要从 API 获取数据
         try:
             if need_update and last_cached_date:
                 # 增量更新：只获取最后缓存日期之后的数据
@@ -181,9 +179,9 @@ class StockDataProvider:
         if not matching_stocks.empty:
             return matching_stocks['code'].iloc[0]
         
-        # 处理XD前缀情况：XD占一个汉字位，尝试匹配XD+用户输入前3字符
+        # 处理 XD 前缀情况：XD 占一个汉字位，尝试匹配 XD+ 用户输入前 3 字符
         if len(stock_name) >= 3:
-            xd_name = 'XD' + stock_name[:3]  # XD + 前3个字符
+            xd_name = 'XD' + stock_name[:3]
             xd_matches = stock_info[stock_info['name'] == xd_name]
             if not xd_matches.empty:
                 print(f"🔍 XD前缀匹配: {stock_name} → {xd_name} ({xd_matches.iloc[0]['code']})")

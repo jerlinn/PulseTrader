@@ -289,9 +289,39 @@ export AIHUBMIX_API_KEY="在上面申请的密钥"
 
 运行指令使其生效
 source ~/.zshrc
+```
 
-# 运行交互式股票分析
+### 🎯 All-in-One 集成模式（推荐）
+
+**PulseTrader 现已提供完整的集成解决方案**，一个脚本完成技术分析 + AI 智能研判：
+
+```bash
+# 交互式分析（推荐新用户）
+python pulse_trader.py
+
+# 直接分析指定股票（完整流程：技术分析 + AI 分析）
+python pulse_trader.py --stock "杭钢股份"
+
+# 仅技术分析（快速查看技术指标和图表）
+python pulse_trader.py --stock "东方电气" --no-ai
+
+# 强制交互模式（即使指定了股票也会进入交互界面）
+python pulse_trader.py --interactive
+```
+
+**工作流程**：
+1. **Step 1**: 输入股票名称 → 技术分析 → 生成交互式图表
+2. **确认环节**: 用户选择是否需要智能分析
+3. **Step 2**: AI 分析图表 → 生成投资研判报告
+
+### 🔧 独立组件使用
+
+```bash
+# 仅使用技术分析组件
 python TrendInsigt.py
+
+# 仅使用 AI 分析组件（需要先有图表文件）
+python analysis.py --chart figures/股票名_PulseTrader_日期.png
 
 # 查询已存储的技术指标
 python indicators_query.py --list                     # 列出所有股票
@@ -319,12 +349,23 @@ python analysis.py --context "从长期价值角度分析，适合定投吗"  # 
 python analysis.py --chart figures/股票名_PulseTrader_日期.png --context "评估突破有效性"
 ```
 
+#### ⏳ 提醒：AI 思考中
+
+当进入智能分析阶段时，终端会显示如下占位信息，表示 AI 正在推理，请耐心等待：
+```
+🤖 AI 分析中...
+📝 (包含推理过程)
+...
+```
+
 ## 📖 项目结构
 
 ```
 PulseTrader/
-├── TrendInsigt.py              # 主程序入口（交互式股票分析）
-├── analysis.py                 # AI 分析模块（GPT-5 集成）
+├── pulse_trader.py             # 🚀 All-in-One 集成脚本（推荐入口）
+├── TrendInsigt.py              # 技术分析组件（可独立运行）
+├── analysis.py                 # AI 分析组件（可独立运行）
+├── analyst_prompt.md           # AI 分析师 system prompt
 ├── plotting_component.py       # 绘图组件（对数坐标可视化）
 ├── rsi_component.py            # RSI 计算与背离检测
 ├── supertrend_component.py     # SuperTrend 指标计算
@@ -336,16 +377,24 @@ PulseTrader/
 │   └── stock_data.db           # SQLite 数据库（统一存储）
 ├── figures/                    # 生成的图表文件
 ├── reports/                    # AI 分析报告（Markdown）
-├── analyst_prompt.md           # AI 分析师 system prompt
-├── 技术指标存储使用说明.md       # 数据存储系统文档
+├── USAGE_PULSE_TRADER.md       # All-in-One 脚本详细使用指南
+├── USAGE_INDICATORS_STORAGE.md # 数据存储系统文档
 └── requirements.txt            # 项目依赖
 ```
+
+### 🎛️ 模块化设计
+
+- **集成层**: `pulse_trader.py` - 统一入口，协调技术分析和 AI 分析
+- **分析层**: `TrendInsigt.py` + `analysis.py` - 独立组件，可单独使用
+- **计算层**: `rsi_component.py` + `supertrend_component.py` - 核心算法
+- **数据层**: `stock_data_provider.py` + `stock_cache.py` - 数据管理
+- **存储层**: `indicators_storage.py` - 技术指标持久化
+- **工具层**: `indicators_query.py` - 数据查询和导出
 
 ## Todo
 - [x] 组件化
 - [x] 对接 LLM
   - [x] system prompt
-  - [ ] 补充到缓存边界，高效利用 752 → 1024 Tokens
   - [x] 计算的部分使用代码解析器
   - [x] 图片读取
   - [x] 把 response 对象中的目标内容提取为 md 文档到 reports 目录
@@ -357,15 +406,12 @@ PulseTrader/
 - [x] 数据交互设计优化：股票名称 → 数据和图表 → LLM → 报告
   - [x] 终端交互优化，实时显示技术指标摘要
   - [x] 重要数据指标传入 user message
-- [x] 分析时可以传入用户的其他上下文，如具体的问题或额外信息（已实现，需要多用例测试）
+- [x] 分析时可以传入用户的其他上下文，如具体的问题或额外信息
 - [x] 修复非交易日获取数据时的处理异常
-  - [x] 集成交易日历 API（akshare.tool_trade_date_hist_sina）
-  - [x] 添加交易日历数据库表和缓存机制
-  - [x] 优化数据更新逻辑，避免周末等非交易日的无效请求
-  - [x] 提供友好的非交易日提示信息
 - [x] 数据传递：补充交易量和量比的存储和传递
 - [x] 对于除权除息日这种边缘情况，用 XD 前缀去匹配
-- [ ] All-in-one 脚本
+- [x] All-in-one 脚本
+- [ ] 引入高量柱和地量标记
   
 ### Prompt 专项
 - [x] 构建场域，影响 LLM 行为

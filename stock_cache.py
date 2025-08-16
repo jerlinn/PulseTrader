@@ -10,7 +10,6 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import Tuple, Optional
 
-
 class StockDataCache:
     """股票数据缓存管理器"""
     
@@ -25,13 +24,8 @@ class StockDataCache:
         self.cache_directory = cache_dir
         self.db_name = db_name
         
-        # 创建缓存目录
         os.makedirs(self.cache_directory, exist_ok=True)
-        
-        # 数据库文件路径
         self.db_path = os.path.join(self.cache_directory, self.db_name)
-        
-        # 初始化数据库
         self.init_database()
     
     def init_database(self):
@@ -91,7 +85,7 @@ class StockDataCache:
         ''')
         
         
-        # 创建RSI背离信号表
+        # 创建 RSI 背离信号表
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS rsi_divergences (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -146,7 +140,7 @@ class StockDataCache:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_indicators_symbol_date ON technical_indicators(symbol, date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_indicators_stock_name ON technical_indicators(stock_name)')
         
-        # RSI背离表索引
+        # RSI 背离表索引
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_divergences_symbol ON rsi_divergences(symbol)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_divergences_date ON rsi_divergences(date)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_divergences_confidence ON rsi_divergences(confidence)')
@@ -234,7 +228,7 @@ class StockDataCache:
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             ))
         
-        # 使用REPLACE INTO来处理重复数据
+        # 使用 REPLACE INTO 来处理重复数据
         cursor.executemany('''
             REPLACE INTO stock_data 
             (symbol, stock_name, date, open_price, high_price, low_price, close_price, volume, daily_change_pct, updated_at)
@@ -444,7 +438,7 @@ class StockDataCache:
             if not result or not result[0]:
                 return False
             
-            # 检查是否在1天内更新
+            # 检查是否在 1 天内更新
             last_update = datetime.strptime(result[0], '%Y-%m-%d %H:%M:%S')
             return (datetime.now() - last_update).days < 1
             
@@ -774,7 +768,7 @@ class StockDataCache:
             if not result or not result[0]:
                 return False
             
-            # 检查是否在7天内更新
+            # 检查是否在 7 天内更新
             last_update = datetime.strptime(result[0], '%Y-%m-%d %H:%M:%S')
             return (datetime.now() - last_update).days < 7
             

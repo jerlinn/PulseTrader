@@ -8,7 +8,6 @@ import os
 # 以量价关系为主要量化依据
 # 基础的超级趋势判断
 # 合适的相对强度背离阈值，过滤大量假信号——顶背离80，底背离中长期20/短期30
-# 对数坐标系，良好的可读性
 
 today = datetime.today().strftime('%Y%m%d')
 output_directory = "figures"
@@ -18,7 +17,6 @@ os.makedirs(output_directory, exist_ok=True)
 
 # 创建数据提供器实例
 data_provider = create_data_provider()
-
 
 def analyze_stock(stock_name, period='1年'):
     """分析指定股票"""
@@ -54,7 +52,7 @@ def analyze_stock(stock_name, period='1年'):
     # 从存储结果中获取背离数据
     divergences_list = enhanced_result['storage_result']['rsi_divergences']
     
-    # 转换背离数据为DataFrame格式以兼容绘图函数
+    # 转换背离数据为 DataFrame 格式以兼容绘图函数
     if divergences_list:
         divergences_data = []
         for div in divergences_list:
@@ -75,7 +73,6 @@ def analyze_stock(stock_name, period='1年'):
     else:
         divergences = pd.DataFrame()
 
-    # 创建图表并显示
     fig = create_stock_chart(enhanced_df, stock_name, divergences, today)
     fig.show()
     
@@ -83,10 +80,8 @@ def analyze_stock(stock_name, period='1年'):
     if indicators_summary:
         current = indicators_summary['current_indicators']
         
-        # 格式化趋势状态
         trend_status = "上升" if current['trend'] == 1 else "下降" if current['trend'] == -1 else "中性"
         
-        # 格式化趋势上下轨
         upper_band = current['upper_band'] if current['upper_band'] is not None else "None"
         lower_band = current['lower_band'] if current['lower_band'] is not None else "None"
         
@@ -121,22 +116,31 @@ def analyze_stock(stock_name, period='1年'):
     
     return fig
 
+def initialize_system():
+    """初始化系统，预加载必要信息"""
+    try:
+        # 显示缓存状态
+        data_provider.show_cache_status()
+        
+        # 预加载股票信息（避免每次分析时重复获取）
+        print("🔄 预加载股票信息...")
+        data_provider.get_stock_info()
+        print("✅ 股票信息加载完成")
+        return True
+    except Exception as e:
+        print(f"⚠️  预加载股票信息失败: {e}")
+        return False
+
 def main():
     """主函数 - 交互式股票分析"""
     print("=" * 50)
     print("         PulseTrader @eviljer")
     print("=" * 50)
     
-    # 显示缓存状态
-    data_provider.show_cache_status()
-    
-    # 预加载股票信息（避免每次分析时重复获取）
-    try:
-        print("🔄 预加载股票信息...")
-        data_provider.get_stock_info()
-        print("✅ 股票信息加载完成")
-    except Exception as e:
-        print(f"⚠️  预加载股票信息失败: {e}")
+    # 初始化系统
+    if not initialize_system():
+        print("系统初始化失败")
+        return
     
     # 默认股票
     default_stock = "杭钢股份"

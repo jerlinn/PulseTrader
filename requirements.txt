@@ -14,10 +14,3 @@ kaleido>=0.2.1
 
 # AI接口支持（可选）
 openai>=1.0.0
-
-# Python标准库（无需安装）
-# datetime
-# decimal
-# os
-# sqlite3
-# typing

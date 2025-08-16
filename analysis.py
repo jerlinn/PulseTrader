@@ -3,10 +3,8 @@ import os
 import base64
 from PIL import Image
 import io
-import json
 from datetime import datetime
 import re
-import sys
 import argparse
 from indicators_storage import IndicatorsStorage
 
@@ -405,20 +403,44 @@ def process_response_stream(response):
         reasoning_display_buffer = ""
         reasoning_started = False
     
-    for event in response:
-        response_events.append(event)
+    # 增强的错误处理
+    try:
+        for event in response:
+            response_events.append(event)
+            
+            # 解析并显示可读内容，添加错误保护
+            try:
+                parsed = parse_event_content(event)
+                if parsed and parsed.get('content') and parsed['content'].strip():
+                    if parsed['type'] == 'text':
+                        print(f"{Colors.GREEN}{parsed['content']}{Colors.ENDC}", end='', flush=True)
+                    elif parsed['type'] == 'reasoning' and SHOW_REASONING_IN_TERMINAL:
+                        process_reasoning_content(parsed['content'])
+                else:
+                    print(".", end='', flush=True)  # 显示进度点
+            except Exception:
+                # 单个事件解析错误不影响整体流程
+                print(".", end='', flush=True)
+    
+    except Exception as e:
+        # 处理各种网络和连接错误
+        error_msg = str(e)
+        if any(keyword in error_msg.lower() for keyword in 
+               ['remoteprotocolerror', 'incomplete chunked read', 'connection', 'timeout']):
+            print(f"\n{Colors.YELLOW}⚠️  网络连接中断，但已接收到部分响应{Colors.ENDC}")
+        else:
+            print(f"\n{Colors.RED}❌ 流处理错误: {error_msg}{Colors.ENDC}")
         
-        # 解析并显示可读内容
-        parsed = parse_event_content(event)
-        if parsed and parsed.get('content') and parsed['content'].strip():
-            if parsed['type'] == 'text':
-                print(f"{Colors.GREEN}{parsed['content']}{Colors.ENDC}", end='', flush=True)
-            elif parsed['type'] == 'reasoning' and SHOW_REASONING_IN_TERMINAL:
-                process_reasoning_content(parsed['content'])
+        # 如果已经收集到一些事件，继续处理
+        if response_events:
+            print(f"{Colors.YELLOW}📄 处理已接收的部分内容...{Colors.ENDC}")
     
     # 完成推理显示
     if SHOW_REASONING_IN_TERMINAL:
-        finish_reasoning_display()
+        try:
+            finish_reasoning_display()
+        except Exception:
+            pass  # 推理显示错误不影响主流程
     
     print(f"\n{Colors.BOLD}" + "-" * 30 + f"{Colors.ENDC}")
     
@@ -537,67 +559,37 @@ def run_analysis(chart_image_path=None, user_context=None):
         stream=True
     )
     
-    # 事件处理 - 添加网络错误处理
-    response_events = []
-    print(f"{Colors.BOLD}🤖 AI 分析中...{Colors.ENDC}")
-    if SHOW_REASONING_IN_TERMINAL:
-        print(f"{Colors.YELLOW}📝 (包含推理过程){Colors.ENDC}")
-
+    # 使用强化错误处理的流处理函数
     try:
-        for event in response:
-            response_events.append(event)
-            
-            # 恢复事件解析，但添加错误处理避免卡住
-            try:
-                parsed = parse_event_content(event)
-                if parsed and parsed.get('content') and parsed['content'].strip():
-                    if parsed['type'] == 'text':
-                        print(f"{Colors.GREEN}{parsed['content']}{Colors.ENDC}", end='', flush=True)
-                    elif parsed['type'] == 'reasoning' and SHOW_REASONING_IN_TERMINAL:
-                        process_reasoning_content(parsed['content'])
-                else:
-                    print(".", end='', flush=True)  # 未解析到内容时显示进度点
-            except Exception:
-                # 如果解析出错，显示进度点并继续
-                print(".", end='', flush=True)
-    
-    except Exception as e:
-        # 处理网络连接错误
-        error_msg = str(e)
-        if 'RemoteProtocolError' in error_msg or 'incomplete chunked read' in error_msg:
-            print(f"\n{Colors.YELLOW}⚠️  网络连接中断，但已接收到部分响应{Colors.ENDC}")
-        else:
-            print(f"\n{Colors.RED}❌ 流处理错误: {error_msg}{Colors.ENDC}")
+        response_events = process_response_stream(response)
         
-        # 如果已经收集到一些事件，继续处理
-        if response_events:
-            print(f"{Colors.YELLOW}📄 处理已接收的部分内容...{Colors.ENDC}")
-
-    # 完成推理显示
-    if SHOW_REASONING_IN_TERMINAL:
-        try:
-            finish_reasoning_display()
-        except Exception:
-            pass  # 如果推理显示出错，忽略并继续
-
-    print(f"\n{Colors.BOLD}" + "-" * 30 + f"{Colors.ENDC}")
-    
-    # 提取内容并保存报告
-    extracted_content = extract_content_from_response(response_events)
-    
-    # 从图表路径自动提取股票名称
-    stock_symbol = extract_stock_symbol_from_path(chart_image_path)
-    print(f"📈 检测到股票: {stock_symbol}")
-    
-    report_path = save_analysis_report(
-        extracted_content, 
-        stock_symbol=stock_symbol, 
-        chart_image_path=chart_image_path
-    )
-    
-    print(f"\n{Colors.GREEN}🎉 分析完成！报告已保存至: {Colors.BLUE}{report_path}{Colors.ENDC}")
-    
-    return response, chart_image_path
+        # 提取内容并保存报告
+        extracted_content = extract_content_from_response(response_events)
+        
+        # 检查是否有有效内容
+        if not extracted_content.get('content') and not response_events:
+            print(f"{Colors.YELLOW}⚠️  未能获取有效的分析内容，可能由于网络中断{Colors.ENDC}")
+            return None, chart_image_path
+        
+        # 从图表路径自动提取股票名称
+        stock_symbol = extract_stock_symbol_from_path(chart_image_path)
+        print(f"📈 检测到股票: {stock_symbol}")
+        
+        # 保存报告
+        report_path = save_analysis_report(
+            extracted_content, 
+            stock_symbol=stock_symbol, 
+            chart_image_path=chart_image_path
+        )
+        
+        print(f"\n{Colors.GREEN}🎉 分析完成！报告已保存至: {Colors.BLUE}{report_path}{Colors.ENDC}")
+        
+        return response, chart_image_path
+        
+    except Exception as e:
+        print(f"\n{Colors.RED}❌ 分析过程中发生严重错误: {e}{Colors.ENDC}")
+        print(f"{Colors.YELLOW}💡 建议检查网络连接后重试{Colors.ENDC}")
+        return None, chart_image_path
 
 def parse_arguments():
     """解析命令行参数"""
@@ -637,7 +629,4 @@ def main():
 
 if __name__ == "__main__":
     # 如果作为脚本直接运行，使用主函数
-    response, used_chart_path = main()
-else:
-    # 如果作为模块导入，使用原有的默认行为
-    response, used_chart_path = run_analysis(user_context=None)
+    main()
