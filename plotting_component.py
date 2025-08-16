@@ -32,20 +32,14 @@ def create_stock_chart(df, stock_name, divergences, today):
     fig.add_trace(go.Bar(x=trading_df['日期'], y=trading_df['成交量'], marker_color=trading_df['Color'], opacity=0.8, name='交易量'), row=2, col=1)
 
     # 添加超级趋势上轨线和下轨线
-    fig.add_trace(go.Scatter(x=df['日期'], y=df['upper_band'], mode='lines', name='压力', line=dict(color='green', shape='spline', dash='dot')), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df['日期'], y=df['lower_band'], mode='lines', name='支撑', line=dict(color='orangered', shape='spline', dash='dot')), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df['日期'], y=df['upper_band'], mode='lines', name='下行', line=dict(color='green', shape='spline', dash='dot')), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df['日期'], y=df['lower_band'], mode='lines', name='上行', line=dict(color='orangered', shape='spline', dash='dot')), row=1, col=1)
 
-    # 添加MA10线
     _add_ma10_line(fig, df)
-    
-    # 添加趋势填充
     _add_trend_filling(fig, df)
-    
-    # 添加信号标记
     _add_signal_markers(fig, df)
 
     # 添加 RSI 指标线到第三个子图
-    # 检查 RSI 列名（rsi14 或 rsi）
     rsi_col = 'rsi14' if 'rsi14' in df.columns else 'rsi'
     fig.add_trace(go.Scatter(
         x=df['日期'], y=df[rsi_col],
@@ -55,17 +49,15 @@ def create_stock_chart(df, stock_name, divergences, today):
     ), row=3, col=1)
 
     # RSI 关键区域参考线-严格
-    fig.add_hline(y=80, line_dash="dot", line_color="red", opacity=0.5, row=3, col=1)     # 超买线
-    fig.add_hline(y=20, line_dash="dot", line_color="green", opacity=0.5, row=3, col=1)   # 超卖线
+    fig.add_hline(y=80, line_dash="dot", line_color="red", opacity=0.3, row=3, col=1)     # 超买线
+    fig.add_hline(y=20, line_dash="dot", line_color="green", opacity=0.3, row=3, col=1)   # 超卖线
 
     # 添加RSI背离标记
     if not divergences.empty:
         _add_divergence_markers(fig, df, divergences)
         
-    # 更新图表布局
     _update_layout(fig, df, stock_name)
 
-    # 保存图表
     fig_name = f'{output_directory}/{stock_name}_TrendSight_{today}.png'
     fig.write_image(fig_name, scale=2)
     
@@ -81,37 +73,20 @@ def _add_ma10_line(fig, df):
         # 作为后备，如果数据库中没有 ma10，则临时计算
         ma_10 = df['收盘'].rolling(window=10).mean()
 
-    # 初始化 MA10 颜色列表
-    ma10_colors = []
-
     # 确保 trend 列存在
     if 'trend' not in df.columns:
         print("⚠️  MA10绘制: 缺少 trend 列，使用默认中性颜色")
         df['trend'] = 0  # 添加默认 trend 列
     
-    # 遍历数据，根据趋势设置 MA10 颜色
-    for trend in df['trend']:
-        if trend == -1:
-            ma10_colors.append('green')  # 下跌趋势用绿色
-        else:
-            ma10_colors.append('red')  # 上涨趋势用红色
-
-    # 添加 MA10 线，颜色随趋势变化
-    for idx in range(len(df) - 1):
-        fig.add_trace(go.Scatter(
-            x=[df['日期'].iloc[idx], df['日期'].iloc[idx + 1]],
-            y=[ma_10.iloc[idx], ma_10.iloc[idx + 1]],
-            mode='lines', line=dict(color=ma10_colors[idx], width=1, shape='spline'),
-            showlegend=False
-        ), row=1, col=1)
-
-        # 在线段的两端添加圆形标记
-        fig.add_trace(go.Scatter(
-            x=[df['日期'].iloc[idx], df['日期'].iloc[idx + 1]],
-            y=[ma_10.iloc[idx], ma_10.iloc[idx + 1]],
-            mode='markers', marker=dict(color=ma10_colors[idx], size=1),
-            showlegend=False
-        ), row=1, col=1)
+    # 添加 MA10 线，使用统一颜色 #0CAEE6
+    fig.add_trace(go.Scatter(
+        x=df['日期'], 
+        y=ma_10,
+        mode='lines', 
+        line=dict(color='#0CAEE6', width=1, shape='spline'),
+        name='MA10',
+        showlegend=True
+    ), row=1, col=1)
 
 def _add_trend_filling(fig, df):
     """添加趋势填充区域"""
@@ -167,7 +142,7 @@ def _add_signal_markers(fig, df):
     # 在 B 信号的位置上添加标记，使用下轨值（lower_band）作为位置
     fig.add_trace(go.Scatter(
         x=[df.loc[pos, '日期'] for pos in b_positions], 
-        y=[df.loc[pos, 'lower_band'] * Decimal('0.995') for pos in b_positions],
+        y=[df.loc[pos, 'lower_band'] * Decimal('0.994') for pos in b_positions],
         mode='markers', name='UP', 
         marker=dict(symbol='arrow', color='orangered', size=10)
     ), row=1, col=1)
@@ -175,7 +150,7 @@ def _add_signal_markers(fig, df):
     # 在 S 信号的位置上添加标记，使用上轨值（upper_band）作为位置
     fig.add_trace(go.Scatter(
         x=[df.loc[pos, '日期'] for pos in s_positions], 
-        y=[df.loc[pos, 'upper_band'] * Decimal('1.005') for pos in s_positions],
+        y=[df.loc[pos, 'upper_band'] * Decimal('1.006') for pos in s_positions],
         mode='markers', name='DOWN', 
         marker=dict(symbol='arrow', angle=180, color='green', size=10)
     ), row=1, col=1)
