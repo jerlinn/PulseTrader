@@ -7,12 +7,12 @@ def calculate_supertrend(df: pd.DataFrame, lookback_periods: int = 14, multiplie
     计算超级趋势指标
     
     Parameters:
-    df: 包含股票数据的DataFrame，需要包含'日期', '开盘', '最高', '最低', '收盘', '成交量'列
-    lookback_periods: 回看周期，默认14
-    multiplier: 乘数，默认2
+    df: 包含股票数据的 DataFrame，需要包含'日期', '开盘', '最高', '最低', '收盘', '成交量'列
+    lookback_periods: 回看周期，默认 14
+    multiplier: 乘数，默认 2
     
     Returns:
-    添加了SuperTrend相关列的DataFrame
+    添加了SuperTrend 相关列的 DataFrame
     """
     # 创建 Quote 实例
     formatted_dates = df['日期'].tolist()
@@ -47,7 +47,7 @@ def get_trend_signals(df: pd.DataFrame) -> tuple:
     获取趋势变化信号
     
     Parameters:
-    df: 包含trend列的DataFrame
+    df: 包含 trend 列的 DataFrame
     
     Returns:
     tuple: (buy_positions, sell_positions) - 买入和卖出信号的索引位置
@@ -69,7 +69,7 @@ def analyze_trend_performance(df: pd.DataFrame) -> dict:
     分析趋势表现
     
     Parameters:
-    df: 包含SuperTrend数据的DataFrame
+    df: 包含 SuperTrend 数据的 DataFrame
     
     Returns:
     dict: 包含趋势分析结果的字典

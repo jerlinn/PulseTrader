@@ -39,13 +39,13 @@ source ~/.zshrc
 
 ### 报告问题
 
-使用 [GitHub Issues](https://github.com/yourusername/PulseTrader/issues) 报告问题时，请包含：
+使用 [GitHub Issues](https://github.com/jerlinn/PulseTrader/issues) 报告问题时，请包含：
 
 - **问题描述**：清晰描述遇到的问题
 - **复现步骤**：详细的操作步骤
 - **预期行为**：期望的正确行为
 - **实际行为**：实际发生的情况
-- **环境信息**：Python 版本、操作系统等
+- **环境信息**：Python 版本、操作系统、网络代理情况等
 - **错误日志**：相关的错误信息
 
 ### 提交代码
