@@ -107,8 +107,8 @@ class IndicatorsStorage:
         # 计算 MA10
         df['ma10'] = df['收盘'].rolling(window=10).mean()
         
-        # 计算量比（当日成交量/过去5日平均成交量）
-        df['vol_ratio'] = df['成交量'] / df['成交量'].rolling(window=5).mean()
+        # 计算量比（当日成交量/前5个交易日平均成交量）
+        df['vol_ratio'] = df['成交量'] / df['成交量'].shift(1).rolling(window=5).mean()
         
         # 处理日涨幅数据：优先使用 akshare 的涨跌幅，否则计算
         if '涨跌幅' in df.columns:

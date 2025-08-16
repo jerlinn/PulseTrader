@@ -60,15 +60,15 @@ def find_peaks_troughs(series: pd.Series, window: int, min_distance: int) -> Tup
         current = series.iloc[i]
         
         # 峰值条件：比两侧的移动平均都高
-        if (current > window_left.mean() * 1.001 and  # 比左侧均值高0.1%
-            current > window_right.mean() * 1.001 and  # 比右侧均值高0.1%
+        if (current > window_left.mean() * 1.001 and  # 比左侧均值高 0.1%
+            current > window_right.mean() * 1.001 and  # 比右侧均值高 0.1%
             current >= series.iloc[i-1] and  # 比前一点高
             current >= series.iloc[i+1]):    # 比后一点高
             peaks.append(i)
             
         # 谷值条件：比两侧的移动平均都低
-        elif (current < window_left.mean() * 0.999 and  # 比左侧均值低0.1%
-              current < window_right.mean() * 0.999 and  # 比右侧均值低0.1%
+        elif (current < window_left.mean() * 0.999 and  # 比左侧均值低 0.1%
+              current < window_right.mean() * 0.999 and  # 比右侧均值低 0.1%
               current <= series.iloc[i-1] and  # 比前一点低
               current <= series.iloc[i+1]):    # 比后一点低
             troughs.append(i)
@@ -98,11 +98,11 @@ def is_valid_divergence(
     
     if divergence_type == 'bearish':
         # 顶背离条件
-        price_condition = current_price > prev_price * 1.001  # 价格上涨超过0.1%
-        rsi_condition = current_rsi < prev_rsi * 0.99        # RSI下降超过1%
-        rsi_range = 50 <= max(current_rsi, prev_rsi) <= 90   # RSI区间
+        price_condition = current_price > prev_price * 1.001  # 价格上涨超过 0.1%
+        rsi_condition = current_rsi < prev_rsi * 0.99        # RSI 下降超过 1%
+        rsi_range = 50 <= max(current_rsi, prev_rsi) <= 90   # RSI 区间
         
-        # 关键约束：统一使用严格标准，RSI必须进入深度超买区域（80以上）
+        # 关键约束：统一使用严格标准，RSI 必须进入深度超买区域（80以上）
         # 这样可以有效屏蔽短期假信号，确保调整充分
         rsi_overbought_crossed = interval_rsi.max() >= 80  # 统一要求触及深度超买线
         
@@ -119,9 +119,9 @@ def is_valid_divergence(
     
     else:  # bullish
         # 底背离条件
-        price_condition = current_price < prev_price * 0.999  # 价格下跌超过0.1%
-        rsi_condition = current_rsi > prev_rsi * 1.01        # RSI上升超过1%
-        rsi_range = 10 <= min(current_rsi, prev_rsi) <= 50   # RSI区间
+        price_condition = current_price < prev_price * 0.999  # 价格下跌超过 0.1%
+        rsi_condition = current_rsi > prev_rsi * 1.01        # RSI 上升超过 1%
+        rsi_range = 10 <= min(current_rsi, prev_rsi) <= 50   # RSI 区间
         
         # 底背离严格阈值：确保充分调整
         # 中长期要求深度超卖，短期相对宽松

@@ -583,12 +583,14 @@ class StockDataCache:
         """
         conn = sqlite3.connect(self.db_path)
         
-        # 获取最新指标数据
+        # 获取最新指标数据，包含收盘价
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT * FROM technical_indicators 
-            WHERE symbol = ? 
-            ORDER BY date DESC 
+            SELECT t.*, s.close_price 
+            FROM technical_indicators t
+            LEFT JOIN stock_data s ON t.symbol = s.symbol AND REPLACE(t.date, '-', '') = s.date
+            WHERE t.symbol = ? 
+            ORDER BY t.date DESC 
             LIMIT 1
         ''', (symbol,))
         

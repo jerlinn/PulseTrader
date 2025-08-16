@@ -285,16 +285,40 @@ cd TrendSight
 # 安装依赖
 pip install -r requirements.txt
 
+# 配置系统环境变量
+例，在 ~/.zshrc 中加入
+export AIHUBMIX_API_KEY="your_api_key_here"
+
+运行指令使其生效
+source ~/.zshrc
+
 # 运行交互式股票分析
 python TrendInsigt.py
 
-# 或运行 AI 分析（需要 AIHUBMIX_API_KEY 环境变量）
-python analysis.py
-
 # 查询已存储的技术指标
-python indicators_query.py --list
-python indicators_query.py 杭钢股份
-python indicators_query.py 杭钢股份 --export
+python indicators_query.py --list                     # 列出所有股票
+python indicators_query.py 杭钢股份                   # 查看指定股票指标
+python indicators_query.py 杭钢股份 --export          # 导出详细数据为CSV
+```
+
+### 🤖 AI 分析师使用指南
+
+**Agent Z** 是你的专业交易代理，支持个性化分析上下文：
+
+```bash
+# 基础分析
+python analysis.py                                    # 使用默认图表
+
+# 交互式分析
+python analysis.py --interactive                      # 程序提示输入分析重点
+
+# 直接指定上下文
+python analysis.py --context "今日减仓比例指导"        # 风险评估
+python analysis.py --context "分析突破有效性，判断追涨时机"  # 突破分析
+python analysis.py --context "从长期价值角度分析，适合定投吗"  # 长期投资
+
+# 指定图表分析
+python analysis.py --chart figures/股票名_TrendSight_日期.png --context "评估突破有效性"
 ```
 
 ## 📖 项目结构

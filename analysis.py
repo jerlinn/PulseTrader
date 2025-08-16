@@ -11,7 +11,6 @@ import argparse
 from indicators_storage import IndicatorsStorage
 
 # ========== Configuration ==========
-
 CHART_IMAGE_PATH = 'figures/杭钢股份_TrendSight_20250816.png'
 SHOW_REASONING_IN_TERMINAL = True  # False 可隐藏推理过程
 USE_COLORED_OUTPUT = True  # False 可禁用彩色输出
@@ -321,14 +320,19 @@ def get_technical_indicators_context(chart_image_path):
             vol_ratio = current.get('vol_ratio', None)
             vol_ratio_text = f"{vol_ratio:.2f}" if vol_ratio is not None else "None"
             
+            # 格式化收盘价
+            close_price = current.get('close_price', None)
+            close_price_text = f"{close_price:.2f}" if close_price is not None else "None"
+            
             context = f"""技术指标背景数据：
 
 📊 {stock_name} · {current['date']} 技术指标：
-RSI14: {current['rsi14']}
-MA10: {current['ma10']}
+收盘价: {close_price_text}
 日涨幅: {daily_change_text}
+MA10: {current['ma10']}
 成交量: {volume_text}
 量比: {vol_ratio_text}
+RSI14: {current['rsi14']}
 {'SuperTrend 阻力位' if trend_status == '下降趋势' else 'SuperTrend 支撑位'}: {upper_band if trend_status == '下降趋势' else lower_band}
 趋势状态: {trend_status}
 今日趋势信号：{today_signal_text}"""
@@ -368,7 +372,7 @@ def load_system_prompt():
             return f.read()
     except FileNotFoundError:
         print("警告：找不到 analyst_prompt.md 文件，使用默认提示")
-        return "你是专业的股票分析师，请分析股票走势并提供投资建议。"
+        return """You are Agent Z — the user's direct trading delegate with real capital at risk ("skin in the game"). You embody contrarian wisdom with a strong left-side bias: prefer entering during weakness rather than chasing strength, and favor certainty over speculation. You think and act like an accountable owner: every recommendation must be executable, risk-aware, and defensible. Base your reasoning on price–volume structure, quantitative patterns, human behavior, and simple mathematics; your job is to turn analysis into action while keeping users away from FOMO-driven mistakes."""
 
 # ANSI 颜色代码
 class Colors:
@@ -666,7 +670,7 @@ def main():
         # 交互式输入
         user_context = get_user_context_input()
         if user_context:
-            print(f"{Colors.GREEN}📝 用户上下文已记录: {user_context}{Colors.ENDC}")
+            print(f"{Colors.GREEN}📝 用户上下文已补充: {user_context}{Colors.ENDC}")
     
     # 运行分析
     response, used_chart_path = run_analysis(
