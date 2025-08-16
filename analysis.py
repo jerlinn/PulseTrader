@@ -10,6 +10,8 @@ import sys
 import argparse
 from indicators_storage import IndicatorsStorage
 
+# 无特别信号时简洁分析
+
 # ========== Configuration ==========
 CHART_IMAGE_PATH = 'figures/杭钢股份_TrendSight_20250816.png'
 SHOW_REASONING_IN_TERMINAL = True  # False 可隐藏推理过程
@@ -181,48 +183,6 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
     # 格式化内容
     formatted_content = format_content(extracted_content['content'])
     
-    # 获取技术指标数据
-    indicators_section = ""
-    if stock_symbol:
-        storage = IndicatorsStorage()
-        indicators_summary = storage.get_latest_indicators(stock_symbol)
-        
-        if indicators_summary:
-            current = indicators_summary['current_indicators']
-            indicators_section = f"""
-## 技术指标数据
-
-**最新数据日期**: {current['date']}
-
-### 核心指标
-- **RSI14**: {current['rsi14']}
-- **MA10**: {current['ma10']}
-- **日涨幅**: {f"{current['daily_change_pct']:.2f}%" if current.get('daily_change_pct') is not None else "无数据"}
-- **成交量**: {f"{current['volume']:.0f}" if current.get('volume') is not None else "无数据"}
-- **量比**: {f"{current['vol_ratio']:.2f}" if current.get('vol_ratio') is not None else "无数据"}
-- **趋势上轨**: {current['upper_band']}
-- **趋势下轨**: {current['lower_band']}
-- **趋势状态**: {"上升" if current['trend'] == 1 else "下降" if current['trend'] == -1 else "中性"}
-
-### 背离信号
-"""
-            
-            if indicators_summary['recent_divergences']:
-                for div in indicators_summary['recent_divergences'][:3]:
-                    div_type = "顶背离" if div['type'] == 'bearish' else "底背离"
-                    timeframe = {"short": "短期", "medium": "中期", "long": "长期"}.get(div['timeframe'], div['timeframe'])
-                    indicators_section += f"- **{div['date']}**: {div_type}({timeframe}) - 置信度: {div['confidence']}%\n"
-            else:
-                indicators_section += "- 暂无显著背离信号\n"
-            
-            indicators_section += "\n### 趋势信号\n"
-            
-            if indicators_summary['recent_trend_signals']:
-                for signal in indicators_summary['recent_trend_signals'][:3]:  # 取前3个最新信号
-                    signal_text = "B" if signal['signal_type'] == 'buy' else "S"
-                    indicators_section += f"- **{signal['date']}**: {signal_text} @ {signal['price']}\n"
-            else:
-                indicators_section += "- 暂无趋势变化信号\n"
     
     # 图表部分（如果有图片路径）
     chart_section = ""
@@ -241,7 +201,7 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
 
 **生成时间**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}  
 
-{chart_section}{indicators_section}
+{chart_section}
 ## 策略研判
 
 {formatted_content}
@@ -288,10 +248,6 @@ def get_technical_indicators_context(chart_image_path):
             # 格式化趋势状态
             trend_status = "上升" if current['trend'] == 1 else "下降" if current['trend'] == -1 else "中性"
             
-            # 格式化趋势上下轨
-            upper_band = current['upper_band'] if current['upper_band'] is not None else "None"
-            lower_band = current['lower_band'] if current['lower_band'] is not None else "None"
-            
             # 格式化今日和最新趋势信号
             today_date = datetime.now().strftime('%Y-%m-%d')
             today_signal_text = "None"
@@ -333,7 +289,6 @@ MA10: {current['ma10']}
 成交量: {volume_text}
 量比: {vol_ratio_text}
 RSI14: {current['rsi14']}
-{'SuperTrend 阻力位' if trend_status == '下降趋势' else 'SuperTrend 支撑位'}: {upper_band if trend_status == '下降趋势' else lower_band}
 趋势状态: {trend_status}
 今日趋势信号：{today_signal_text}"""
             
