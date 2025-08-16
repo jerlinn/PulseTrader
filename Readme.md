@@ -1,6 +1,6 @@
-## PulseTrader - 探讨 AI 量化投资的正确方向
-
 ![og-image](https://raw.githubusercontent.com/jerlinn/PulseTrader/main/assets/og-image.webp)
+
+## PulseTrader - 探讨 AI 量化投资的正确方向
 
 在当今快速变化的金融市场中，我注意到一个吊诡的现象：**市面上许多 AI 量化工具似乎在关键环节上偏离了正确方向**。
 
