@@ -59,9 +59,13 @@ def create_stock_chart(df, stock_name, divergences, today):
     _update_layout(fig, df, stock_name)
 
     fig_name = f'{output_directory}/{stock_name}_PulseTrader_{today}.png'
+    html_name = f'{output_directory}/{stock_name}_PulseTrader_{today}.html'
+    
     fig.write_image(fig_name, scale=2)
+    fig.write_html(html_name)
     
     print(f"图表已保存至: {fig_name}")
+    print(f"HTML 版本已保存至: {html_name}")
     return fig
 
 def _add_ma10_line(fig, df):
