@@ -25,7 +25,7 @@ PulseTrader 采用**分离式架构设计**，确保计算的绝对精确性和 
 ### 技术架构
 
 ```mermaid
-graph TD
+graph LR
     %% 用户交互层 - 圆角矩形
     USER([输入股票名称]) --> APP([应用层<br/>TrendInsigt.py])
     
@@ -61,7 +61,7 @@ graph TD
     classDef dataLayer fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px,color:#000
     class DATA dataLayer
     
-    %% 存储层样式 - 红色系，加粗边框表示核心
+    %% 存储层样式 - 红色系
     classDef storageLayer fill:#ffebee,stroke:#d32f2f,stroke-width:4px,color:#000
     class CACHE storageLayer
     
@@ -238,12 +238,30 @@ graph LR
 
 **简化设计**：
 - 极简交互：输入股票名称即开始分析
-- 对数坐标：用距离代表百分比，相同倍数 = 相同高度，长期趋势与复利一眼可读
+- 对数坐标：用距离代表百分比，相同倍数即相同高度，长期趋势与复利一眼可读
 - 人性量化：RSI 背离检测捕捉情绪临界点
 
 ## 🚀 快速开始
 
 该项目的分析模块需要 AIHUBMIX API KEY，先到 [Aihubmix 官网申请](https://aihubmix.com/token)。
+
+### 环境准备
+
+**安装 .NET Runtime**（技术指标计算依赖）：
+
+```bash
+# macOS
+brew install dotnet
+
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y dotnet-runtime-8.0
+
+# Windows
+# 下载并安装 .NET 8.0 Runtime: https://dotnet.microsoft.com/download
+```
+
+**安装项目依赖**：
 
 ```bash
 # 克隆仓库
@@ -263,7 +281,7 @@ source ~/.zshrc
 
 ### 使用方式
 
-#### 🎯 All-in-One 模式（推荐）
+#### All-in-One 模式（推荐）
 
 ```bash
 # 交互式分析（推荐新用户）
@@ -276,7 +294,7 @@ python pulse_trader.py --stock "杭钢股份"
 python pulse_trader.py --stock "东方电气" --no-ai
 ```
 
-#### 🔧 独立组件模式
+#### 独立组件模式
 
 ```bash
 # 技术分析组件
@@ -289,7 +307,7 @@ python analysis.py --chart figures/股票名_PulseTrader_日期.png
 python indicators_query.py 杭钢股份 --export
 ```
 
-#### 🤖 AI 分析定制
+#### AI 分析定制
 
 ```bash
 # 指定分析上下文
