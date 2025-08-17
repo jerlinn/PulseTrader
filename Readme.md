@@ -47,7 +47,7 @@ graph LR
     VIZ --> CHART([交互式图表输出])
     
     %% AI 分析层 - 云形状
-    STORE --> AI{{AI分析<br/>analysis.py<br/>GPT-5}}
+    STORE --> AI{{AI 分析<br/>analysis.py<br/>GPT-5}}
     AI --> REPORT([智能分析报告])
     
     %% 工具层 - 圆形

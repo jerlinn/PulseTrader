@@ -52,7 +52,7 @@ def create_stock_chart(df, stock_name, divergences, today):
     fig.add_hline(y=80, line_dash="dot", line_color="red", opacity=0.3, row=3, col=1)     # 超买线
     fig.add_hline(y=20, line_dash="dot", line_color="green", opacity=0.3, row=3, col=1)   # 超卖线
 
-    # 添加RSI背离标记
+    # 添加 RSI 背离标记
     if not divergences.empty:
         _add_divergence_markers(fig, df, divergences)
         
@@ -69,7 +69,7 @@ def create_stock_chart(df, stock_name, divergences, today):
     return fig
 
 def _add_ma10_line(fig, df):
-    """添加MA10移动平均线"""
+    """添加 MA10"""
     # 检查是否有已计算的 ma10 列，如果没有则计算
     if 'ma10' in df.columns:
         ma_10 = df['ma10']
@@ -82,7 +82,6 @@ def _add_ma10_line(fig, df):
         print("⚠️  MA10绘制: 缺少 trend 列，使用默认中性颜色")
         df['trend'] = 0  # 添加默认 trend 列
     
-    # 添加 MA10 线，使用统一颜色 #0CAEE6
     fig.add_trace(go.Scatter(
         x=df['日期'], 
         y=ma_10,
@@ -160,7 +159,7 @@ def _add_signal_markers(fig, df):
     ), row=1, col=1)
 
 def _add_divergence_markers(fig, df, divergences):
-    """添加RSI背离标记"""
+    """添加 RSI 背离标记"""
     for _, div in divergences.iterrows():
         div_date = div['date']
         if div_date in df['日期'].values:
@@ -172,12 +171,12 @@ def _add_divergence_markers(fig, df, divergences):
             fig.add_vline(
                 x=div_date,
                 line_dash="solid",
-                line_color="rgba(255, 255, 255, 0.7)",
+                line_color="rgba(255, 255, 255, 0.9)",
                 line_width=1,
                 row=1, col=1
             )
             
-            # 在RSI图上标记背离
+            # 在 RSI 图上标记背离
             date_mask = df['日期'] == div_date
             if date_mask.any():
                 rsi_value = df.loc[date_mask, 'rsi'].iloc[0]
@@ -195,8 +194,7 @@ def _add_divergence_markers(fig, df, divergences):
                     ), row=3, col=1)
 
 def _update_layout(fig, df, stock_name):
-    """更新图表布局"""
-    # 更新图表布局，添加周期切换按钮
+    """更新图表布局，添加周期切换按钮"""
     fig.update_layout(
         height=800, width=1080, 
         title={
@@ -247,12 +245,10 @@ def _update_layout(fig, df, stock_name):
         ]
     )
 
-    # 更新y轴的标题
     fig.update_yaxes(title_text='价格', type="log", row=1, col=1)
     fig.update_yaxes(title_text='交易量', row=2, col=1)
     fig.update_yaxes(title_text='RSI', row=3, col=1, range=[0, 100])
 
-    # x轴格式化和网格线设置
     fig.update_xaxes(showgrid=False)
     fig.update_xaxes(
         tickformat="%Y-%m-%d",
