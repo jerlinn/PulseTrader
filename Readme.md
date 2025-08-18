@@ -240,6 +240,8 @@ graph LR
 
 **可视化特点**：默认采用对数坐标——用距离表示百分比，跨数量级比较更可靠；交互式图表一键切换周期
 
+![交互式图表](https://raw.githubusercontent.com/jerlinn/PulseTrader/main/assets/plot.gif)
+
 ### 成交量指标系统
 
 **三大成交量信号识别**：
