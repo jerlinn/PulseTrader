@@ -12,6 +12,7 @@ import os
 基础的超级趋势判断
 合适的相对强度背离阈值，过滤大量假信号
 A/H 股名称相同时，用股票代号进行查询
+大标题推荐安装 Smiley Sans 字体: https://github.com/atelier-anchor/smiley-sans
 """
 
 today = datetime.today().strftime('%Y%m%d')

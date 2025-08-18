@@ -308,7 +308,7 @@ def _update_layout(fig, df, stock_name):
         height=800, width=1080, 
         title={
             'text': f'<b>PulseTrader<b> · {stock_name}',
-            'font': dict(family="SartSans-Regular", size=40, color="#222222")
+            'font': dict(family="Smiley Sans", size=40, color="#222222") #自用 SartSans-Regular
         }, 
         title_x=0.475, 
         legend_title='图例',
