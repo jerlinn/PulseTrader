@@ -8,9 +8,14 @@ import re
 import argparse
 from indicators_storage import IndicatorsStorage
 
-# 无特别信号时简洁分析
-# code_interpreter 工具不支持 reasoning.effort 最低档位 'minimal'
-# 如需更深度的推理，使用 reasoning={ "effort": "high", "summary": "auto" },
+"""
+@eviljer
+
+* 无特别信号时简洁分析
+* 独立运作时，需要先用 TrendInsigt.py 处理数据
+* code_interpreter 工具不支持 reasoning.effort 最低档位 'minimal'
+* 如需更深度的推理，使用 reasoning={ "effort": "high", "summary": "auto" },
+"""
 
 # ========== Configuration ==========
 CHART_IMAGE_PATH = 'figures/腾讯控股_PulseTrader_20250818.png'
