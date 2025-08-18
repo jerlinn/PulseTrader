@@ -14,7 +14,6 @@ import argparse
 from TrendInsigt import analyze_stock as trend_analyze_stock, initialize_system
 from analysis import run_analysis as ai_analysis
 
-
 class PulseTraderIntegrated:
     """PulseTrader 集成管理器"""
     
