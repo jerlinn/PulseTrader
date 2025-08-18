@@ -11,10 +11,10 @@ from indicators_storage import IndicatorsStorage
 # 无特别信号时简洁分析
 
 # ========== Configuration ==========
-CHART_IMAGE_PATH = 'figures/杭钢股份_PulseTrader_20250816.png'
+CHART_IMAGE_PATH = 'figures/腾讯控股_PulseTrader_20250818.png'
 SHOW_REASONING_IN_TERMINAL = True  # False 可隐藏推理过程
 USE_COLORED_OUTPUT = True  # False 可禁用彩色输出
-BUFFER_REASONING_CHUNKS = True  # 缓存推理片段
+SIMPLE_DISPLAY_MODE = True  # True 启用简化显示模式
 
 # 全局变量用于推理过程显示
 reasoning_buffer = []
@@ -45,20 +45,26 @@ def encode_image(image_path, max_size=512):
     return base64.b64encode(image_bytes).decode('utf-8')
 
 def parse_event_content(event):
-    """解析单个事件的内容，区分文本输出、推理输出和工具输出"""
+    """解析单个事件的内容，基于OpenAI官方文档优化处理"""
     try:
         event_str = str(event)
+        event_type = type(event).__name__
         
-        # 跳过工具调用相关的输出（代码执行）
-        if 'ResponseToolCallDeltaEvent' in event_str:
-            return {'type': 'tool_call', 'content': None}
+        # 检测流完成事件
+        if event_type == 'ResponseCompletedEvent':
+            return {'type': 'completed', 'content': None}
         
-        # 跳过代码输出相关的事件
-        if 'tool_call' in event_str.lower() or 'code_interpreter' in event_str.lower():
-            return {'type': 'tool_call', 'content': None}
+        # 处理 code interpreter 相关事件
+        if any(ci_marker in event_str for ci_marker in [
+            'ResponseCodeInterpreterToolCall',
+            'ResponseToolCallDeltaEvent', 
+            'code_interpreter_call',
+            'container_id'
+        ]):
+            return {'type': 'code_interpreter', 'content': None}
         
-        # 处理推理过程输出
-        if 'ResponseReasoningDeltaEvent' in event_str or 'ResponseReasoningSummaryTextDeltaEvent' in event_str:
+        # 处理推理过程输出（流式） - 增强检测
+        if 'Reasoning' in event_type and 'Delta' in event_type:
             if 'delta=' in event_str:
                 delta_start = event_str.find("delta='") + 7
                 delta_end = event_str.find("'", delta_start)
@@ -66,21 +72,28 @@ def parse_event_content(event):
                     delta_content = event_str[delta_start:delta_end]
                     return {'type': 'reasoning', 'content': delta_content}
         
-        # 处理纯文本响应事件
-        if 'ResponseTextDeltaEvent' in event_str:
-            # 提取 delta 内容
+        # 处理推理过程汇总
+        if event_type == 'ResponseReasoningSummaryTextDeltaEvent':
             if 'delta=' in event_str:
                 delta_start = event_str.find("delta='") + 7
                 delta_end = event_str.find("'", delta_start)
                 if delta_start > 6 and delta_end > delta_start:
                     delta_content = event_str[delta_start:delta_end]
-                    # 更精确的代码过滤：只过滤明显的 Python 代码行
-                    if (delta_content.startswith(('from ', 'import ', 'img.', 'Image.', 'display(')) or
-                        '/mnt/data/' in delta_content or
-                        delta_content.strip().endswith(('.png', '.jpg', '.jpeg'))):
-                        return {'type': 'code', 'content': None}
+                    return {'type': 'reasoning_summary', 'content': delta_content}
+        
+        # 处理最终文本输出（非推理、非代码）
+        if event_type == 'ResponseTextDeltaEvent':
+            if 'delta=' in event_str:
+                delta_start = event_str.find("delta='") + 7
+                delta_end = event_str.find("'", delta_start)
+                if delta_start > 6 and delta_end > delta_start:
+                    delta_content = event_str[delta_start:delta_end]
                     return {'type': 'text', 'content': delta_content}
         
+        # 处理输出消息（完整消息）
+        if event_type == 'ResponseOutputMessage':
+            return {'type': 'output_message', 'content': None}
+            
     except Exception:
         pass
     return None
@@ -181,7 +194,6 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
     # 格式化内容
     formatted_content = format_content(extracted_content['content'])
     
-    
     # 图表部分（如果有图片路径）
     chart_section = ""
     if chart_image_path and os.path.exists(chart_image_path):
@@ -194,7 +206,6 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
 
 """
     
-    # 构建 MD 文档内容
     md_content = f"""# 📊 交易诊断书 · {stock_symbol or "未指定"}
 
 **生成时间**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}  
@@ -210,15 +221,13 @@ PulseTrader：计算你的计划。
 
 """
     
-    # 保存文件
     with open(filepath, 'w', encoding='utf-8') as f:
         f.write(md_content)
     
-    print(f"分析报告已保存至: {filepath}")
     return filepath
 
 def get_technical_indicators_context(chart_image_path):
-    """从图片路径推断股票并获取技术指标上下文，在后续的 all-in-one 合入中，不再计算技术指标，直接从上一节点传递"""
+    """从图片路径推断股票并获取技术指标上下文"""
     if not chart_image_path or not os.path.exists(chart_image_path):
         return ""
     
@@ -229,12 +238,11 @@ def get_technical_indicators_context(chart_image_path):
     if not stock_name:
         return ""
     
-    # 获取股票代码
+    # 获取股票代码（支持多市场搜索）
     try:
         from stock_data_provider import create_data_provider
         data_provider = create_data_provider()
-        stock_info = data_provider.get_stock_info()
-        stock_symbol = data_provider.get_stock_symbol(stock_info, stock_name)
+        stock_symbol, _ = data_provider.get_stock_symbol(stock_name)
         
         # 获取技术指标数据
         storage = IndicatorsStorage()
@@ -345,9 +353,10 @@ def process_response_stream(response):
     
     # 收集所有响应事件并实时显示内容
     response_events = []
-    print(f"{Colors.BOLD}🤖 AI 分析中...{Colors.ENDC}")
     if SHOW_REASONING_IN_TERMINAL:
-        print(f"{Colors.YELLOW}📝 (包含推理过程){Colors.ENDC}")
+        print(f"{Colors.BOLD}🤖 AI 分析中... {Colors.YELLOW}(包含推理过程){Colors.ENDC}")
+    else:
+        print(f"{Colors.BOLD}🤖 AI 分析中...{Colors.ENDC}")
     
     def process_reasoning_content(content):
         """处理推理内容，按句子单位显示"""
@@ -378,7 +387,7 @@ def process_response_stream(response):
         # 显示完整句子
         for sentence in sentences:
             if not reasoning_started:
-                print(f"\n\n{Colors.BLUE}🧠 [推理过程]:{Colors.ENDC}")
+                print(f"\n\n{Colors.BLUE}🧠 [Thinking]{Colors.ENDC}")
                 reasoning_started = True
             
             print(f"{Colors.BLUE}{sentence}{Colors.ENDC}")
@@ -386,48 +395,70 @@ def process_response_stream(response):
         # 更新缓冲区为剩余文本
         reasoning_display_buffer = remaining_text
     
-    def finish_reasoning_display():
-        """完成推理显示，输出剩余内容"""
-        global reasoning_display_buffer, reasoning_started
-        
-        if reasoning_display_buffer.strip():
-            if not reasoning_started:
-                print(f"\n\n{Colors.BLUE}🧠 [推理过程]:{Colors.ENDC}")
-                print(f"{Colors.BLUE}{'-' * 30}{Colors.ENDC}")
-            
-            print(f"{Colors.BLUE}{reasoning_display_buffer.strip()}{Colors.ENDC}")
-        
-        if reasoning_started:
-            print(f"{Colors.BLUE}{'-' * 30}{Colors.ENDC}")
-        
-        reasoning_display_buffer = ""
-        reasoning_started = False
+    # 优雅的流处理，基于 OpenAI 官方文档最佳实践
+    event_count = 0
+    max_events = 1000  # 增加事件限制以支持复杂分析
+    reasoning_event_count = 0
+    max_reasoning_events = 200  # 增加推理事件限制
+    text_output_started = False  # 标记文本输出是否开始
     
-    # 增强的错误处理
     try:
         for event in response:
+            event_count += 1
             response_events.append(event)
+            
+            # 防止无限循环 - 静默处理
+            if event_count > max_events:
+                break
             
             # 解析并显示可读内容，添加错误保护
             try:
                 parsed = parse_event_content(event)
-                if parsed and parsed.get('content') and parsed['content'].strip():
-                    if parsed['type'] == 'text':
+                
+                
+                if parsed:
+                    if parsed['type'] == 'text' and parsed.get('content'):
+                        if not text_output_started:
+                            text_output_started = True
+                            print(f"\n\n{Colors.BOLD}📋 [Analysis]{Colors.ENDC}")
                         print(f"{Colors.GREEN}{parsed['content']}{Colors.ENDC}", end='', flush=True)
-                    elif parsed['type'] == 'reasoning' and SHOW_REASONING_IN_TERMINAL:
-                        process_reasoning_content(parsed['content'])
+                    elif parsed['type'] in ['reasoning', 'reasoning_summary'] and SHOW_REASONING_IN_TERMINAL:
+                        reasoning_event_count += 1
+                        # 调试：显示推理事件统计
+                        if reasoning_event_count == 1:
+                            print(f"\n{Colors.BLUE}🧠 [Thinking]{Colors.ENDC}")
+                            reasoning_started = True
+                        
+                        if parsed.get('content'):
+                            if reasoning_event_count <= max_reasoning_events:
+                                print(f"{Colors.BLUE}{parsed['content']}{Colors.ENDC}", end='', flush=True)
+                            elif reasoning_event_count == max_reasoning_events + 1:
+                                print(f"\n{Colors.YELLOW}推理内容较多，切换为摘要显示{Colors.ENDC}")
+                    elif parsed['type'] == 'code_interpreter':
+                        # 代码执行事件 - 静默处理，符合预期
+                        pass
+                    elif parsed['type'] == 'output_message':
+                        # 输出消息完成标志
+                        pass
+                    elif parsed['type'] == 'completed':
+                        # 流完成事件 - 优雅退出
+                        print(f"\n{Colors.GREEN}[Done]{Colors.ENDC}")
+                        break
                 else:
-                    print(".", end='', flush=True)  # 显示进度点
+                    # 每50个事件显示一个进度点
+                    if event_count % 50 == 0:
+                        print(".", end='', flush=True)
             except Exception:
                 # 单个事件解析错误不影响整体流程
-                print(".", end='', flush=True)
+                if event_count % 100 == 0:  # 减少进度点显示频率
+                    print(".", end='', flush=True)
     
     except Exception as e:
         # 处理各种网络和连接错误
         error_msg = str(e)
         if any(keyword in error_msg.lower() for keyword in 
                ['remoteprotocolerror', 'incomplete chunked read', 'connection', 'timeout']):
-            print(f"\n{Colors.YELLOW}⚠️  网络连接中断，但已接收到部分响应{Colors.ENDC}")
+            print(f"\n{Colors.YELLOW}⚠️ 网络连接中断，但已接收到部分响应{Colors.ENDC}")
         else:
             print(f"\n{Colors.RED}❌ 流处理错误: {error_msg}{Colors.ENDC}")
         
@@ -442,60 +473,22 @@ def process_response_stream(response):
         except Exception:
             pass  # 推理显示错误不影响主流程
     
-    print(f"\n{Colors.BOLD}" + "-" * 30 + f"{Colors.ENDC}")
-    
     return response_events
 
 def process_reasoning_content(content):
-    """处理推理内容，按句子单位显示"""
+    """简化的推理内容显示"""
     global reasoning_display_buffer, reasoning_started
     
-    reasoning_display_buffer += content
+    if not reasoning_started:
+        print(f"\n\n{Colors.BLUE}🧠 [Thinking]{Colors.ENDC}")
+        reasoning_started = True
     
-    # 检查是否有完整的句子
-    sentences = []
-    remaining_text = reasoning_display_buffer
-    
-    # 按句子分割（支持中英文标点）
-    sentence_endings = ['. ', '。', '! ', '！', '? ', '？', '\n']
-    
-    for ending in sentence_endings:
-        if ending in remaining_text:
-            parts = remaining_text.split(ending)
-            # 除了最后一部分，其他都是完整句子
-            for part in parts[:-1]:
-                sentence = part + ending.strip()
-                if sentence.strip():
-                    sentences.append(sentence.strip())
-            
-            # 更新剩余文本
-            remaining_text = parts[-1]
-            break
-    
-    # 显示完整句子
-    for sentence in sentences:
-        if not reasoning_started:
-            print(f"\n\n{Colors.BLUE}🧠 [推理过程]:{Colors.ENDC}")
-            reasoning_started = True
-        
-        print(f"{Colors.BLUE}{sentence}{Colors.ENDC}")
-    
-    # 更新缓冲区为剩余文本
-    reasoning_display_buffer = remaining_text
+    # 简化显示，直接输出内容
+    print(f"{Colors.BLUE}{content}{Colors.ENDC}", end='', flush=True)
 
 def finish_reasoning_display():
-    """完成推理显示，输出剩余内容"""
+    """简化的推理显示结束"""
     global reasoning_display_buffer, reasoning_started
-    
-    if reasoning_display_buffer.strip():
-        if not reasoning_started:
-            print(f"\n\n{Colors.BLUE}🧠 [推理过程]:{Colors.ENDC}")
-            print(f"{Colors.BLUE}{'-' * 30}{Colors.ENDC}")
-        
-        print(f"{Colors.BLUE}{reasoning_display_buffer.strip()}{Colors.ENDC}")
-    
-    if reasoning_started:
-        print(f"{Colors.BLUE}{'-' * 30}{Colors.ENDC}")
     
     reasoning_display_buffer = ""
     reasoning_started = False
@@ -563,26 +556,22 @@ def run_analysis(chart_image_path=None, user_context=None):
     try:
         response_events = process_response_stream(response)
         
-        # 提取内容并保存报告
         extracted_content = extract_content_from_response(response_events)
         
         # 检查是否有有效内容
         if not extracted_content.get('content') and not response_events:
-            print(f"{Colors.YELLOW}⚠️  未能获取有效的分析内容，可能由于网络中断{Colors.ENDC}")
+            print(f"{Colors.YELLOW}⚠️ 未能获取有效的分析内容，可能由于网络中断{Colors.ENDC}")
             return None, chart_image_path
         
-        # 从图表路径自动提取股票名称
+        # 从图表路径提取股票名称并保存报告
         stock_symbol = extract_stock_symbol_from_path(chart_image_path)
-        print(f"📈 检测到股票: {stock_symbol}")
-        
-        # 保存报告
         report_path = save_analysis_report(
             extracted_content, 
             stock_symbol=stock_symbol, 
             chart_image_path=chart_image_path
         )
         
-        print(f"\n{Colors.GREEN}🎉 分析完成！报告已保存至: {Colors.BLUE}{report_path}{Colors.ENDC}")
+        print(f"\n{Colors.GREEN}🎉 {stock_symbol} 分析完成，报告已保存: {Colors.BLUE}{os.path.basename(report_path)}{Colors.ENDC}")
         
         return response, chart_image_path
         

@@ -86,6 +86,7 @@ graph LR
 - **统一数据库**：SQLite 一库统管，6 张数据表科学设计，消除重复存储
 - **精确计算**：100% 可靠算法，数据完整性检验 + Wilder 等确定性算法
 - **智能缓存**：增量更新、快速查询，内置交易日历避免无效请求
+- **多市场支持**：统一架构下支持 A 股和港股，自动识别股票代码类型
 
 ### 数据库表结构设计
 
@@ -107,6 +108,7 @@ erDiagram
         real close_price
         integer volume
         real daily_change_pct
+        string market_type "a=A股, hk=港股"
         datetime created_at
         datetime updated_at
         unique symbol_date "UNIQUE(symbol, date)"
@@ -163,9 +165,10 @@ erDiagram
         integer id PK
         string code
         string name
+        string market_type "a=A股, hk=港股"
         datetime created_at
         datetime updated_at
-        unique code "UNIQUE(code)"
+        unique code_market "UNIQUE(code, market_type)"
     }
     
     trading_calendar {
@@ -287,8 +290,12 @@ source ~/.zshrc
 # 交互式分析（推荐新用户）
 python pulse_trader.py
 
-# 直接分析指定股票
+# 直接分析指定 A 股
 python pulse_trader.py --stock "杭钢股份"
+
+# 直接分析指定港股（支持股票名称或代码）
+python pulse_trader.py --stock "腾讯控股"
+python pulse_trader.py --stock "00700"
 
 # 仅技术分析（无 AI）
 python pulse_trader.py --stock "东方电气" --no-ai
@@ -326,7 +333,7 @@ PulseTrader/
 ├── plotting_component.py       # 绘图组件（对数坐标可视化）
 ├── rsi_component.py            # RSI 计算与背离检测
 ├── supertrend_component.py     # SuperTrend 指标计算
-├── stock_data_provider.py      # 数据提供者接口
+├── stock_data_provider.py      # 数据提供者接口（支持 A 股+港股）
 ├── stock_cache.py              # 统一数据库管理（SQLite）
 ├── indicators_storage.py       # 技术指标计算和存储
 ├── indicators_query.py         # 数据查询和导出工具
@@ -345,6 +352,18 @@ PulseTrader/
 - **计算层**: `rsi_component.py` + `supertrend_component.py` - 核心算法
 - **数据层**: `stock_data_provider.py` + `stock_cache.py` - 数据管理
 
+### 🌏 多市场支持
+
+**支持市场**：
+- **A 股**：上海、深圳证券交易所上市股票
+- **港股**：香港联合交易所上市股票
+
+**智能识别**：
+- **A 股代码**：6 位数字格式（如 `600519`, `000001`）
+- **港股代码**：5 位数字格式，以 0 开头（如 `00700`, `00941`）
+- **自动搜索**：输入股票名称时自动跨市场搜索
+- **精确匹配**：支持 XD 前缀等特殊情况处理
+
 ## Todo
 - [x] 组件化
 - [x] 对接 LLM
@@ -358,8 +377,8 @@ PulseTrader/
 - [x] 修复非交易日获取数据时的处理异常
 - [x] 对于除权除息日这种边缘情况，用 XD 前缀去匹配
 - [x] All-in-one 脚本
+- [x] H 股支持
 - [ ] 引入高量柱和地量标记
-- [ ] H 股支持
 
 ## 🤝 贡献指南
 

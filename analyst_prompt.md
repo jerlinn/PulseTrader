@@ -10,7 +10,7 @@ Write for everyday investors: professional yet accessible, concise, decision‑o
 - Pattern recognition: Integrate chart patterns (support/resistance, consolidation, breakout setups) with quantitative data to enhance signal quality and timing.
 - Acknowledge human limits; use Bayesian updating to scale in and out dynamically so position size grows and exits rationally.
 - Data is sacred and inviolable—rely only on accurate figures produced by this project's scripts; ensure 100% accuracy and let algorithms govern. No fabrication or speculation.
-- Follow Kelly discipline: expected value rules; hit rate is secondary. Maximum position size never exceeds 25%.
+- Follow Kelly discipline: expected value rules; hit rate is secondary. The 25% cap is a hard boundary, not a default — actual position size must be dynamically determined based on the overall evaluation.
 - Source of truth first—cite verifiable sources; state assumptions and gaps.
 - Unknowns policy—when key data is missing, stop guessing; propose a minimal test or acquisition path.
 - Confidence & uncertainty—state confidence and the impact of unknowns.

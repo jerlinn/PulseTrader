@@ -22,11 +22,20 @@ def analyze_stock(stock_name, period='1年'):
     """分析指定股票"""
     print(f"正在分析股票: {stock_name} ({period})")
     
-    # 获取股票代码（只在首次调用时获取股票信息）
+    # 获取股票代码（支持多市场搜索和直接代码输入）
     try:
-        stock_info = data_provider.get_stock_info()
-        stock_symbol = data_provider.get_stock_symbol(stock_info, stock_name)
-        symbol = stock_symbol
+        # 先检查是否是直接输入的股票代码
+        try:
+            market_type = data_provider.detect_market_type(stock_name)
+            # 如果能检测到市场类型，说明是有效的股票代码
+            symbol = stock_name
+            market_name = '港股' if market_type == 'hk' else 'A股'
+            print(f"📊 使用{market_name}代码: {symbol}")
+        except ValueError:
+            # 不是有效代码格式，尝试通过名称搜索
+            symbol, market_type = data_provider.get_stock_symbol(stock_name)
+            market_name = '港股' if market_type == 'hk' else 'A股'
+            print(f"📊 找到{market_name}: {stock_name} ({symbol})")
     except ValueError as e:
         print(f"错误: {e}")
         print("请检查股票名称是否正确")
@@ -42,8 +51,24 @@ def analyze_stock(stock_name, period='1年'):
         print("❌ 无法获取股票数据")
         return None
 
+    # 从数据库中查询真正的股票名称
+    try:
+        import sqlite3
+        conn = sqlite3.connect('cache/stock_data.db')
+        cursor = conn.cursor()
+        cursor.execute('SELECT DISTINCT stock_name FROM stock_data WHERE symbol = ? AND stock_name != ? LIMIT 1', (symbol, symbol))
+        result = cursor.fetchone()
+        conn.close()
+        
+        if result and result[0]:
+            actual_stock_name = result[0]
+        else:
+            actual_stock_name = stock_name  # fallback 到用户输入的名称
+    except Exception as e:
+        actual_stock_name = stock_name  # fallback 到用户输入的名称
+
     # 计算并存储技术指标
-    enhanced_result = enhance_analysis_with_indicators(df, stock_name, symbol)
+    enhanced_result = enhance_analysis_with_indicators(df, actual_stock_name, symbol)
     
     # 使用增强后的数据框
     enhanced_df = enhanced_result['enhanced_dataframe']
@@ -73,7 +98,7 @@ def analyze_stock(stock_name, period='1年'):
     else:
         divergences = pd.DataFrame()
 
-    fig = create_stock_chart(enhanced_df, stock_name, divergences, today)
+    fig = create_stock_chart(enhanced_df, actual_stock_name, divergences, today)
     fig.show()
     
     # 打印技术指标摘要
@@ -124,7 +149,8 @@ def initialize_system():
         
         # 预加载股票信息（避免每次分析时重复获取）
         print("🔄 预加载股票信息...")
-        data_provider.get_stock_info()
+        data_provider.get_stock_info('a')  # 预加载A股信息
+        data_provider.get_stock_info('hk')  # 预加载港股信息
         print("✅ 股票信息加载完成")
         return True
     except Exception as e:

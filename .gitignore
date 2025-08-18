@@ -3,6 +3,7 @@ archive
 todo.md
 SUPPORT.md
 CLAUDE.md
+figures/*.html
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

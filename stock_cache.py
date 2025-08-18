@@ -46,6 +46,7 @@ class StockDataCache:
                 close_price REAL,
                 volume INTEGER,
                 daily_change_pct REAL,
+                market_type TEXT DEFAULT 'a',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(symbol, date)
@@ -56,10 +57,12 @@ class StockDataCache:
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS stock_info (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                code TEXT UNIQUE NOT NULL,
+                code TEXT NOT NULL,
                 name TEXT NOT NULL,
+                market_type TEXT DEFAULT 'a',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(code, market_type)
             )
         ''')
         
@@ -152,11 +155,50 @@ class StockDataCache:
         # 交易日历表索引
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_trade_date ON trading_calendar(trade_date)')
         
+        # 升级数据库结构：为现有表添加市场类型字段
+        self._upgrade_database_schema(cursor)
         
         conn.commit()
         conn.close()
     
-    def get_cached_data(self, symbol: str, stock_name: str, start_date: str, end_date: str) -> pd.DataFrame:
+    def _upgrade_database_schema(self, cursor):
+        """升级数据库结构以支持多市场"""
+        try:
+            # 检查 stock_data 表是否有 market_type 字段
+            cursor.execute("PRAGMA table_info(stock_data)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'market_type' not in columns:
+                print("🔄 升级数据库：为 stock_data 表添加 market_type 字段...")
+                cursor.execute('ALTER TABLE stock_data ADD COLUMN market_type TEXT DEFAULT "a"')
+            
+            # 检查 stock_info 表结构
+            cursor.execute("PRAGMA table_info(stock_info)")
+            columns = [column[1] for column in cursor.fetchall()]
+            
+            if 'market_type' not in columns:
+                print("🔄 升级数据库：为 stock_info 表添加 market_type 字段...")
+                cursor.execute('ALTER TABLE stock_info ADD COLUMN market_type TEXT DEFAULT "a"')
+                # 重新创建唯一约束
+                cursor.execute('DROP INDEX IF EXISTS sqlite_autoindex_stock_info_1')
+                cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_info_unique ON stock_info(code, market_type)')
+                
+        except Exception as e:
+            print(f"⚠️ 数据库升级时出现警告: {e}")
+    
+    def _table_exists(self, table_name: str) -> bool:
+        """检查表是否存在"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        
+        try:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,))
+            result = cursor.fetchone()
+            return result is not None
+        finally:
+            conn.close()
+    
+    def get_cached_data(self, symbol: str, stock_name: str, start_date: str, end_date: str, market_type: str = 'a') -> pd.DataFrame:
         """
         从缓存中获取股票数据
         
@@ -165,6 +207,7 @@ class StockDataCache:
             stock_name: 股票名称
             start_date: 开始日期 (YYYYMMDD)
             end_date: 结束日期 (YYYYMMDD)
+            market_type: 市场类型 ('a' 或 'hk')
             
         Returns:
             包含股票数据的DataFrame
@@ -176,11 +219,11 @@ class StockDataCache:
                    low_price as 最低, close_price as 收盘, volume as 成交量,
                    daily_change_pct as 日涨幅
             FROM stock_data 
-            WHERE symbol = ? AND date BETWEEN ? AND ?
+            WHERE symbol = ? AND date BETWEEN ? AND ? AND market_type = ?
             ORDER BY date ASC
         '''
         
-        df = pd.read_sql_query(query, conn, params=(symbol, start_date, end_date))
+        df = pd.read_sql_query(query, conn, params=(symbol, start_date, end_date, market_type))
         conn.close()
         
         if not df.empty:
@@ -190,7 +233,7 @@ class StockDataCache:
         
         return df
     
-    def save_to_cache(self, symbol: str, stock_name: str, df: pd.DataFrame):
+    def save_to_cache(self, symbol: str, stock_name: str, df: pd.DataFrame, market_type: str = 'a'):
         """
         保存股票数据到缓存
         
@@ -198,6 +241,7 @@ class StockDataCache:
             symbol: 股票代码
             stock_name: 股票名称
             df: 要保存的股票数据DataFrame
+            market_type: 市场类型 ('a' 或 'hk')
         """
         if df.empty:
             return
@@ -225,14 +269,15 @@ class StockDataCache:
                 float(row['收盘']),
                 int(row['成交量']),
                 daily_change,
+                market_type,
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             ))
         
         # 使用 REPLACE INTO 来处理重复数据
         cursor.executemany('''
             REPLACE INTO stock_data 
-            (symbol, stock_name, date, open_price, high_price, low_price, close_price, volume, daily_change_pct, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (symbol, stock_name, date, open_price, high_price, low_price, close_price, volume, daily_change_pct, market_type, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', data_to_insert)
         
         conn.commit()
@@ -369,9 +414,12 @@ class StockDataCache:
         conn.commit()
         conn.close()
     
-    def get_cached_stock_info(self) -> pd.DataFrame:
+    def get_cached_stock_info(self, market_type: str = 'a') -> pd.DataFrame:
         """
         从缓存中获取股票信息列表
+        
+        Args:
+            market_type: 市场类型 ('a' 或 'hk')
         
         Returns:
             包含股票信息的DataFrame (code, name列)
@@ -380,18 +428,19 @@ class StockDataCache:
             return pd.DataFrame()
             
         conn = sqlite3.connect(self.db_path)
-        query = 'SELECT code, name FROM stock_info ORDER BY code'
-        df = pd.read_sql_query(query, conn)
+        query = 'SELECT code, name FROM stock_info WHERE market_type = ? ORDER BY code'
+        df = pd.read_sql_query(query, conn, params=(market_type,))
         conn.close()
         
         return df
     
-    def save_stock_info_to_cache(self, stock_info_df: pd.DataFrame):
+    def save_stock_info_to_cache(self, stock_info_df: pd.DataFrame, market_type: str = 'a'):
         """
         保存股票信息列表到缓存
         
         Args:
             stock_info_df: 股票信息DataFrame (需包含code和name列)
+            market_type: 市场类型 ('a' 或 'hk')
         """
         if stock_info_df.empty:
             return
@@ -399,28 +448,32 @@ class StockDataCache:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        # 清除旧数据
-        cursor.execute('DELETE FROM stock_info')
+        # 清除该市场的旧数据
+        cursor.execute('DELETE FROM stock_info WHERE market_type = ?', (market_type,))
         
         # 准备数据
         data_to_insert = [
-            (row['code'], row['name'], datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
+            (row['code'], row['name'], market_type, datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
             for _, row in stock_info_df.iterrows()
         ]
         
         # 批量插入
         cursor.executemany('''
-            INSERT INTO stock_info (code, name, updated_at)
-            VALUES (?, ?, ?)
+            INSERT INTO stock_info (code, name, market_type, updated_at)
+            VALUES (?, ?, ?, ?)
         ''', data_to_insert)
         
         conn.commit()
         conn.close()
-        print(f"✅ 已缓存 {len(data_to_insert)} 只股票信息")
+        market_name = '港股' if market_type == 'hk' else 'A股'
+        print(f"✅ 已缓存 {len(data_to_insert)} 只{market_name}信息")
     
-    def is_stock_info_cache_valid(self) -> bool:
+    def is_stock_info_cache_valid(self, market_type: str = 'a') -> bool:
         """
         检查股票信息缓存是否有效（1天内更新的）
+        
+        Args:
+            market_type: 市场类型 ('a' 或 'hk')
         
         Returns:
             True if cache is valid, False otherwise
@@ -432,7 +485,7 @@ class StockDataCache:
         cursor = conn.cursor()
         
         try:
-            cursor.execute('SELECT MAX(updated_at) FROM stock_info')
+            cursor.execute('SELECT MAX(updated_at) FROM stock_info WHERE market_type = ?', (market_type,))
             result = cursor.fetchone()
             
             if not result or not result[0]:
@@ -705,6 +758,10 @@ class StockDataCache:
         Returns:
             True if trading day, False otherwise
         """
+        # 如果表不存在，假设是交易日
+        if not self._table_exists('trading_calendar'):
+            return True
+            
         # 格式化日期字符串为 YYYY-MM-DD
         if len(date_str) == 8:  # YYYYMMDD format
             date_formatted = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]}"
@@ -714,11 +771,14 @@ class StockDataCache:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        cursor.execute('SELECT COUNT(*) FROM trading_calendar WHERE trade_date = ?', (date_formatted,))
-        result = cursor.fetchone()
-        conn.close()
-        
-        return result[0] > 0 if result else False
+        try:
+            cursor.execute('SELECT COUNT(*) FROM trading_calendar WHERE trade_date = ?', (date_formatted,))
+            result = cursor.fetchone()
+            return result[0] > 0 if result else False
+        except Exception:
+            return True  # 如果查询失败，假设是交易日
+        finally:
+            conn.close()
     
     def get_last_trading_day(self, before_date: str = None) -> Optional[str]:
         """
@@ -730,23 +790,30 @@ class StockDataCache:
         Returns:
             最近的交易日字符串 (YYYY-MM-DD) 或 None
         """
+        # 如果表不存在，返回None
+        if not self._table_exists('trading_calendar'):
+            return None
+            
         if before_date is None:
             before_date = datetime.today().strftime('%Y-%m-%d')
         
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        cursor.execute('''
-            SELECT trade_date FROM trading_calendar 
-            WHERE trade_date <= ? 
-            ORDER BY trade_date DESC 
-            LIMIT 1
-        ''', (before_date,))
-        
-        result = cursor.fetchone()
-        conn.close()
-        
-        return result[0] if result else None
+        try:
+            cursor.execute('''
+                SELECT trade_date FROM trading_calendar 
+                WHERE trade_date <= ? 
+                ORDER BY trade_date DESC 
+                LIMIT 1
+            ''', (before_date,))
+            
+            result = cursor.fetchone()
+            return result[0] if result else None
+        except Exception:
+            return None
+        finally:
+            conn.close()
     
     def is_trading_calendar_cache_valid(self) -> bool:
         """
@@ -756,6 +823,10 @@ class StockDataCache:
             True if cache is valid, False otherwise
         """
         if not os.path.exists(self.db_path):
+            return False
+        
+        # 检查表是否存在
+        if not self._table_exists('trading_calendar'):
             return False
             
         conn = sqlite3.connect(self.db_path)
