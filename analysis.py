@@ -9,6 +9,8 @@ import argparse
 from indicators_storage import IndicatorsStorage
 
 # 无特别信号时简洁分析
+# code_interpreter 工具不支持 reasoning.effort 最低档位 'minimal'
+# 如需更深度的推理，使用 reasoning={ "effort": "high", "summary": "auto" },
 
 # ========== Configuration ==========
 CHART_IMAGE_PATH = 'figures/腾讯控股_PulseTrader_20250818.png'
@@ -45,7 +47,7 @@ def encode_image(image_path, max_size=512):
     return base64.b64encode(image_bytes).decode('utf-8')
 
 def parse_event_content(event):
-    """解析单个事件的内容，基于OpenAI官方文档优化处理"""
+    """解析单个事件的内容，基于 OpenAI 官方文档优化处理"""
     try:
         event_str = str(event)
         event_type = type(event).__name__
@@ -183,7 +185,6 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
     """Save report as MD with technical indicators data"""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     
-    # 生成文件名
     if stock_symbol:
         filename = f"{stock_symbol}_分析报告_{timestamp}.md"
     else:
@@ -191,7 +192,6 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
     
     filepath = os.path.join("reports", filename)
     
-    # 格式化内容
     formatted_content = format_content(extracted_content['content'])
     
     # 图表部分（如果有图片路径）
@@ -358,42 +358,6 @@ def process_response_stream(response):
     else:
         print(f"{Colors.BOLD}🤖 AI 分析中...{Colors.ENDC}")
     
-    def process_reasoning_content(content):
-        """处理推理内容，按句子单位显示"""
-        global reasoning_display_buffer, reasoning_started
-        
-        reasoning_display_buffer += content
-        
-        # 检查是否有完整的句子
-        sentences = []
-        remaining_text = reasoning_display_buffer
-        
-        # 按句子分割（支持中英文标点）
-        sentence_endings = ['. ', '。', '! ', '！', '? ', '？', '\n']
-        
-        for ending in sentence_endings:
-            if ending in remaining_text:
-                parts = remaining_text.split(ending)
-                # 除了最后一部分，其他都是完整句子
-                for part in parts[:-1]:
-                    sentence = part + ending.strip()
-                    if sentence.strip():
-                        sentences.append(sentence.strip())
-                
-                # 更新剩余文本
-                remaining_text = parts[-1]
-                break
-        
-        # 显示完整句子
-        for sentence in sentences:
-            if not reasoning_started:
-                print(f"\n\n{Colors.BLUE}🧠 [Thinking]{Colors.ENDC}")
-                reasoning_started = True
-            
-            print(f"{Colors.BLUE}{sentence}{Colors.ENDC}")
-        
-        # 更新缓冲区为剩余文本
-        reasoning_display_buffer = remaining_text
     
     # 优雅的流处理，基于 OpenAI 官方文档最佳实践
     event_count = 0
@@ -475,16 +439,6 @@ def process_response_stream(response):
     
     return response_events
 
-def process_reasoning_content(content):
-    """简化的推理内容显示"""
-    global reasoning_display_buffer, reasoning_started
-    
-    if not reasoning_started:
-        print(f"\n\n{Colors.BLUE}🧠 [Thinking]{Colors.ENDC}")
-        reasoning_started = True
-    
-    # 简化显示，直接输出内容
-    print(f"{Colors.BLUE}{content}{Colors.ENDC}", end='', flush=True)
 
 def finish_reasoning_display():
     """简化的推理显示结束"""
@@ -608,7 +562,6 @@ def main():
         if user_context:
             print(f"{Colors.GREEN}📝 用户上下文已补充: {user_context}{Colors.ENDC}")
     
-    # 运行分析
     response, used_chart_path = run_analysis(
         chart_image_path=args.chart, 
         user_context=user_context
