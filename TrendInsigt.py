@@ -5,9 +5,14 @@ from plotting_component import create_stock_chart
 from indicators_storage import enhance_analysis_with_indicators
 import os
 
-# 以量价关系为主要量化依据
-# 基础的超级趋势判断
-# 合适的相对强度背离阈值，过滤大量假信号——顶背离80，底背离中长期20/短期30
+"""
+@eviljer
+
+以量价关系为主要量化依据
+基础的超级趋势判断
+合适的相对强度背离阈值，过滤大量假信号
+A/H 股名称相同时，用股票代号进行查询
+"""
 
 today = datetime.today().strftime('%Y%m%d')
 output_directory = "figures"
@@ -159,9 +164,7 @@ def initialize_system():
 
 def main():
     """主函数 - 交互式股票分析"""
-    print("=" * 50)
     print("         PulseTrader @eviljer")
-    print("=" * 50)
     
     # 初始化系统
     if not initialize_system():

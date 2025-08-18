@@ -127,6 +127,14 @@ erDiagram
         real lower_band
         real volume
         real vol_ratio
+        real vol_20d_avg
+        real vol_20d_max
+        real vol_50d_min
+        integer is_high_vol_bar
+        integer is_sky_vol_bar
+        integer is_low_vol_bar
+        integer near_20d_high
+        integer price_condition
         datetime created_at
         datetime updated_at
         unique symbol_date "UNIQUE(symbol, date)"
@@ -231,6 +239,42 @@ graph LR
 
 **可视化特点**：默认采用对数坐标——用距离表示百分比，跨数量级比较更可靠；交互式图表一键切换周期
 
+### 成交量指标系统
+
+**三大成交量信号识别**：
+- **极致缩量**：当日成交量为 50 日最低量，往往出现在市场恐慌或关注度极低时
+- **放量**：20 日最高成交量 + 接近 20 日新高 + 强势上涨（日涨幅 >1.5% 且盘中涨幅 >2%）
+- **爆量**：放量基础上成交量超过 20 日均量 3.5 倍的极端情况
+
+**量价配合原理**：
+```mermaid
+graph LR
+    %% 量价关系分析
+    VOL([成交量数据]) --> CALC{指标计算}
+    PRICE([价格数据]) --> CALC
+    
+    %% 三种成交量信号判断
+    CALC --> LOW[极致缩量<br/>50 日最低量<br/>情绪低迷信号]
+    CALC --> HIGH[放量<br/>量价齐升<br/>资金关注度高]
+    CALC --> SKY[爆量<br/>极端爆量<br/>情绪达到沸点]
+    
+    %% 投资含义
+    LOW --> MEANING1[孕育机会]
+    HIGH --> MEANING2[趋势延续]
+    SKY --> MEANING3[谨慎追高]
+    
+    %% 样式定义
+    classDef volLow fill:#e3f2fd,stroke:#1976d2,stroke-width:2px,color:#000
+    classDef volHigh fill:#fff3e0,stroke:#f57c00,stroke-width:2px,color:#000
+    classDef volSky fill:#ffebee,stroke:#d32f2f,stroke-width:2px,color:#000
+    classDef meaning fill:#e8f5e8,stroke:#2e7d32,stroke-width:2px,color:#000
+    
+    class LOW,MEANING1 volLow
+    class HIGH,MEANING2 volHigh
+    class SKY,MEANING3 volSky
+    class VOL,PRICE,CALC meaning
+```
+
 ## 🧐 一个真正好用的量化投资工具
 
 ### 核心优势
@@ -333,6 +377,7 @@ PulseTrader/
 ├── plotting_component.py       # 绘图组件（对数坐标可视化）
 ├── rsi_component.py            # RSI 计算与背离检测
 ├── supertrend_component.py     # SuperTrend 指标计算
+├── volume_indicators.py        # 成交量指标计算（极致缩量、放量、爆量）
 ├── stock_data_provider.py      # 数据提供者接口（支持 A 股+港股）
 ├── stock_cache.py              # 统一数据库管理（SQLite）
 ├── indicators_storage.py       # 技术指标计算和存储
@@ -349,7 +394,7 @@ PulseTrader/
 **层次设计**：
 - **集成层**: `pulse_trader.py` - 统一入口
 - **分析层**: `TrendInsigt.py` + `analysis.py` - 独立组件
-- **计算层**: `rsi_component.py` + `supertrend_component.py` - 核心算法
+- **计算层**: `rsi_component.py` + `supertrend_component.py` + `volume_indicators.py` - 核心算法
 - **数据层**: `stock_data_provider.py` + `stock_cache.py` - 数据管理
 
 ### 🌏 多市场支持
@@ -378,7 +423,7 @@ PulseTrader/
 - [x] 对于除权除息日这种边缘情况，用 XD 前缀去匹配
 - [x] All-in-one 脚本
 - [x] H 股支持
-- [ ] 引入高量柱和地量标记
+- [x] 成交量指标：极致缩量、放量、爆量识别与可视化
 
 ## 🤝 贡献指南
 

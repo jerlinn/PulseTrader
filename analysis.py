@@ -287,6 +287,30 @@ def get_technical_indicators_context(chart_image_path):
             vol_ratio = current.get('vol_ratio', None)
             vol_ratio_text = f"{vol_ratio:.2f}" if vol_ratio is not None else "None"
             
+            # 检查成交量指标并构建上下文
+            volume_signal_context = ""
+            
+            # 检查是否为高量柱（20日最高量）
+            if current.get('is_high_vol_bar'):
+                vol_20d_max = current.get('vol_20d_max', None)
+                vol_20d_avg = current.get('vol_20d_avg', None)
+                if vol_20d_max and vol_20d_avg:
+                    volume_signal_context += f"\n当日成交量 {volume_text} 为 20 日最高量，20 日平均量 {vol_20d_avg:.0f}"
+            
+            # 检查是否为天量柱（20日最高量且显著爆量）
+            if current.get('is_sky_vol_bar'):
+                vol_20d_max = current.get('vol_20d_max', None)
+                vol_20d_avg = current.get('vol_20d_avg', None)
+                if vol_20d_max and vol_20d_avg and volume:
+                    vol_multiple = volume / vol_20d_avg
+                    volume_signal_context += f"\n当日成交量 {volume_text} 为 20 日最高量且达到 20 日均量的 {vol_multiple:.1f} 倍"
+            
+            # 检查是否为地量柱（50日最低量）
+            if current.get('is_low_vol_bar'):
+                vol_50d_min = current.get('vol_50d_min', None)
+                if vol_50d_min:
+                    volume_signal_context += f"\n当日成交量 {volume_text} 为 50 日最低量"
+            
             # 格式化收盘价
             close_price = current.get('close_price', None)
             close_price_text = f"{close_price:.2f}" if close_price is not None else "None"
@@ -305,6 +329,10 @@ RSI14: {current['rsi14']}
             
             if latest_signal_text:
                 context += f"\n最新信号：{latest_signal_text}"
+                
+            # 添加成交量信号信息（如果有的话）
+            if volume_signal_context:
+                context += volume_signal_context
             
             return context + "\n\n"
     

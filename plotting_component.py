@@ -1,8 +1,6 @@
 import plotly.graph_objs as go
 from plotly.subplots import make_subplots
-from datetime import datetime
 from decimal import Decimal
-import pandas as pd
 import os
 
 def create_stock_chart(df, stock_name, divergences, today):
@@ -23,13 +21,8 @@ def create_stock_chart(df, stock_name, divergences, today):
                                  open=trading_df['开盘'], high=trading_df['最高'], low=trading_df['最低'], close=trading_df['收盘'],
                                  name='日 K', legendgroup='1', legendrank=1), row=1, col=1)
 
-    # 计算每日涨跌幅
-    trading_df = trading_df.copy()  # 避免 SettingWithCopyWarning
-    trading_df['Change'] = trading_df['收盘'] - trading_df['开盘']
-    trading_df['Color'] = trading_df['Change'].apply(lambda x: 'red' if x > 0 else 'green')
-
-    # 添加交易量柱状图，并根据涨跌情况设置颜色
-    fig.add_trace(go.Bar(x=trading_df['日期'], y=trading_df['成交量'], marker_color=trading_df['Color'], opacity=0.8, name='交易量'), row=2, col=1)
+    # 添加增强的成交量可视化
+    _add_enhanced_volume_bars(fig, trading_df, df)
 
     # 添加超级趋势上轨线和下轨线
     fig.add_trace(go.Scatter(x=df['日期'], y=df['upper_band'], mode='lines', name='下行', line=dict(color='green', shape='spline', dash='dot')), row=1, col=1)
@@ -192,6 +185,122 @@ def _add_divergence_markers(fig, df, divergences):
                         ),
                         showlegend=False
                     ), row=3, col=1)
+
+def _add_enhanced_volume_bars(fig, trading_df, df):
+    """添加增强的成交量可视化，突出显示极致缩量、放量、爆量"""
+    
+    # 检查必要的成交量指标列是否存在
+    volume_indicator_cols = ['is_low_vol_bar', 'is_high_vol_bar', 'is_sky_vol_bar']
+    has_volume_indicators = all(col in df.columns for col in volume_indicator_cols)
+    
+    if not has_volume_indicators:
+        _add_basic_volume_bars(fig, trading_df)
+        return
+    
+    # 不需要 merge，因为 trading_df 本身就是从 df 筛得出
+    enhanced_trading_df = df[df['日期'].notnull()].copy()
+    
+    # 计算涨跌幅用于颜色
+    enhanced_trading_df['Change'] = enhanced_trading_df['收盘'] - enhanced_trading_df['开盘']
+    
+    # 为不同类型的成交量柱设置不同颜色
+    volume_colors = []
+    for _, row in enhanced_trading_df.iterrows():
+        if row['is_low_vol_bar']:
+            volume_colors.append('#77BF4D')  # 极致缩量：绿色
+        elif row['Change'] > 0:
+            volume_colors.append('red')  # 所有上涨（包括普通涨、高量、天量）：红色
+        else:
+            volume_colors.append('green')  # 下跌：绿色
+    
+    # 创建自定义的hover信息，包含成交量类型
+    hover_texts = []
+    for _, row in enhanced_trading_df.iterrows():
+        vol_type = ""
+        if row['is_sky_vol_bar']:
+            vol_type = " (爆量)"
+        elif row['is_high_vol_bar']:
+            vol_type = " (放量)"
+        elif row['is_low_vol_bar']:
+            vol_type = " (极致缩量)"
+        
+        hover_texts.append(f"日期: {row['日期'].strftime('%Y-%m-%d')}<br>成交量: {row['成交量']:,.0f}{vol_type}")
+    
+    # 添加主要的成交量柱状图（带颜色区分和类型说明）
+    fig.add_trace(go.Bar(
+        x=enhanced_trading_df['日期'], 
+        y=enhanced_trading_df['成交量'], 
+        marker_color=volume_colors, 
+        name='交易量',
+        hovertemplate='%{customdata}<extra></extra>',
+        customdata=hover_texts
+    ), row=2, col=1)
+    
+    # 添加顶部标记来区分天量柱和高量柱
+    _add_volume_top_markers(fig, enhanced_trading_df)
+
+def _add_basic_volume_bars(fig, trading_df):
+    """添加基础成交量柱状图（当成交量指标不可用时的回退方案）"""
+    # 计算涨跌幅用于颜色
+    trading_df = trading_df.copy()
+    trading_df['Change'] = trading_df['收盘'] - trading_df['开盘']
+    trading_df['Color'] = trading_df['Change'].apply(lambda x: 'red' if x > 0 else 'green')
+
+    # 基础交易量柱状图
+    fig.add_trace(go.Bar(
+        x=trading_df['日期'], 
+        y=trading_df['成交量'], 
+        marker_color=trading_df['Color'], 
+        name='交易量',
+        hovertemplate='日期: %{x}<br>成交量: %{y:,.0f}<extra></extra>'
+    ), row=2, col=1)
+
+def _add_volume_top_markers(fig, df):
+    """在红色成交量柱顶部添加标记来区分爆量和放量"""
+    
+    if '成交量' not in df.columns or df.empty:
+        return
+    
+    try:
+        # 爆量标记：实心圆 ●
+        sky_vol_data = df[df['is_sky_vol_bar'] == True]
+        if not sky_vol_data.empty:
+            # 在成交量图上添加标记
+            fig.add_trace(go.Scatter(
+                x=sky_vol_data['日期'],
+                y=sky_vol_data['成交量'] * 1.1,
+                mode='markers',
+                marker=dict(size=4, color='red', symbol='circle'),
+                name='爆量',
+                showlegend=False,
+                hovertemplate='爆量<br>日期: %{x}<br>成交量: %{y:,.0f}<extra></extra>'
+            ), row=2, col=1)
+            
+            # 为每个爆量在第一个价格子图添加垂直辅助线
+            for date in sky_vol_data['日期']:
+                fig.add_vline(
+                    x=date,
+                    line_dash="solid",
+                    line_color="rgba(255, 255, 255, 0.9)",
+                    line_width=1,
+                    row=1, col=1
+                )
+        
+        # 放量标记：空心圆 ○
+        high_vol_data = df[df['is_high_vol_bar'] == True]
+        if not high_vol_data.empty:
+            fig.add_trace(go.Scatter(
+                x=high_vol_data['日期'],
+                y=high_vol_data['成交量'] * 1.1,
+                mode='markers',
+                marker=dict(size=4, color='red', symbol='circle-open', line=dict(width=1)),
+                name='放量',
+                showlegend=False,
+                hovertemplate='放量<br>日期: %{x}<br>成交量: %{y:,.0f}<extra></extra>'
+            ), row=2, col=1)
+    except Exception:
+        # 静默跳过标记添加失败
+        pass
 
 def _update_layout(fig, df, stock_name):
     """更新图表布局，添加周期切换按钮"""

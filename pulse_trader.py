@@ -95,14 +95,13 @@ class PulseTraderIntegrated:
     def confirm_ai_analysis(self) -> tuple[bool, str]:
         """询问用户是否需要 AI 分析，并获取额外的分析上下文"""
         print(f"\n🤖 是否进入智能分析？")
-        print("   AI 将基于技术图表提供投资建议和策略研判")
         
         try:
             choice = input("请选择 (y/n): ").strip().lower()
             if choice in ['y', 'yes', '是', 'Y']:
                 # 获取额外的分析上下文
                 print(f"\n💡 提供额外的信息")
-                context = input("请输入（可选，直接回车跳过）: ").strip()
+                context = input("请输入（可选，回车跳过补充）: ").strip()
                 return True, context if context else None
             else:
                 return False, None

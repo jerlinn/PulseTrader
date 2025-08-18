@@ -4,6 +4,7 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from rsi_component import calculate_rsi, detect_rsi_divergence
 from supertrend_component import calculate_supertrend, get_trend_signals
+from volume_indicators import calculate_volume_indicators
 from stock_cache import StockDataCache
 
 
@@ -21,6 +22,15 @@ class TechnicalIndicators:
     # 成交量相关指标
     volume: Optional[float] = None  # 当日成交量
     vol_ratio: Optional[float] = None  # 量比（当日成交量/过去5日平均成交量）
+    # 成交量指标增强
+    vol_20d_avg: Optional[float] = None  # 20日平均成交量
+    vol_20d_max: Optional[float] = None  # 20日最大成交量
+    vol_50d_min: Optional[float] = None  # 50日最小成交量
+    is_high_vol_bar: Optional[bool] = None  # 是否为放量
+    is_sky_vol_bar: Optional[bool] = None  # 是否为爆量
+    is_low_vol_bar: Optional[bool] = None  # 是否为极致缩量
+    near_20d_high: Optional[bool] = None  # 是否接近20日新高
+    price_condition: Optional[bool] = None  # 是否满足价格条件
 
 
 @dataclass
@@ -110,6 +120,9 @@ class IndicatorsStorage:
         # 计算量比（当日成交量/前5个交易日平均成交量）
         df['vol_ratio'] = df['成交量'] / df['成交量'].shift(1).rolling(window=5).mean()
         
+        # 计算成交量指标（3 种特别量柱）
+        df = calculate_volume_indicators(df)
+        
         # 处理日涨幅数据：优先使用 akshare 的涨跌幅，否则计算
         if '涨跌幅' in df.columns:
             df['日涨幅'] = df['涨跌幅']  # 直接使用 akshare 的涨跌幅字段
@@ -144,6 +157,14 @@ class IndicatorsStorage:
                 except (ValueError, TypeError):
                     return default
             
+            def safe_bool(value, default=False):
+                if pd.isnull(value) or value is None:
+                    return default
+                try:
+                    return bool(value)
+                except (ValueError, TypeError):
+                    return default
+            
             indicator = TechnicalIndicators(
                 date=date_str,
                 rsi14=safe_float(safe_get('rsi14')),
@@ -153,7 +174,16 @@ class IndicatorsStorage:
                 lower_band=safe_float(safe_get('lower_band')),
                 trend=safe_int(safe_get('trend', 0)),
                 volume=safe_float(safe_get('成交量')),
-                vol_ratio=safe_float(safe_get('vol_ratio'), 2)
+                vol_ratio=safe_float(safe_get('vol_ratio'), 2),
+                # 成交量指标增强
+                vol_20d_avg=safe_float(safe_get('vol_20d_avg')),
+                vol_20d_max=safe_float(safe_get('vol_20d_max')),
+                vol_50d_min=safe_float(safe_get('vol_50d_min')),
+                is_high_vol_bar=safe_bool(safe_get('is_high_vol_bar')),
+                is_sky_vol_bar=safe_bool(safe_get('is_sky_vol_bar')),
+                is_low_vol_bar=safe_bool(safe_get('is_low_vol_bar')),
+                near_20d_high=safe_bool(safe_get('near_20d_high')),
+                price_condition=safe_bool(safe_get('price_condition'))
             )
             
             indicators_list.append(indicator)

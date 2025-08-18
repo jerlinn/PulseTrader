@@ -162,7 +162,7 @@ class StockDataCache:
         conn.close()
     
     def _upgrade_database_schema(self, cursor):
-        """升级数据库结构以支持多市场"""
+        """升级数据库结构以支持多市场和成交量指标"""
         try:
             # 检查 stock_data 表是否有 market_type 字段
             cursor.execute("PRAGMA table_info(stock_data)")
@@ -182,6 +182,26 @@ class StockDataCache:
                 # 重新创建唯一约束
                 cursor.execute('DROP INDEX IF EXISTS sqlite_autoindex_stock_info_1')
                 cursor.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_stock_info_unique ON stock_info(code, market_type)')
+            
+            # 检查 technical_indicators 表是否有新的成交量指标字段
+            cursor.execute("PRAGMA table_info(technical_indicators)")
+            tech_columns = [column[1] for column in cursor.fetchall()]
+            
+            volume_indicator_fields = [
+                ('vol_20d_avg', 'REAL'),
+                ('vol_20d_max', 'REAL'), 
+                ('vol_50d_min', 'REAL'),
+                ('is_high_vol_bar', 'INTEGER DEFAULT 0'),
+                ('is_sky_vol_bar', 'INTEGER DEFAULT 0'),
+                ('is_low_vol_bar', 'INTEGER DEFAULT 0'),
+                ('near_20d_high', 'INTEGER DEFAULT 0'),
+                ('price_condition', 'INTEGER DEFAULT 0')
+            ]
+            
+            for field_name, field_type in volume_indicator_fields:
+                if field_name not in tech_columns:
+                    print(f"🔄 升级数据库：为 technical_indicators 表添加 {field_name} 字段...")
+                    cursor.execute(f'ALTER TABLE technical_indicators ADD COLUMN {field_name} {field_type}')
                 
         except Exception as e:
             print(f"⚠️ 数据库升级时出现警告: {e}")
@@ -530,14 +550,24 @@ class StockDataCache:
                 indicator.lower_band,
                 indicator.volume,
                 indicator.vol_ratio,
+                # 成交量指标增强
+                indicator.vol_20d_avg,
+                indicator.vol_20d_max,
+                indicator.vol_50d_min,
+                1 if indicator.is_high_vol_bar else 0,
+                1 if indicator.is_sky_vol_bar else 0,
+                1 if indicator.is_low_vol_bar else 0,
+                1 if indicator.near_20d_high else 0,
+                1 if indicator.price_condition else 0,
                 datetime.now().strftime('%Y-%m-%d %H:%M:%S')
             ))
         
         # 使用REPLACE INTO处理重复数据
         cursor.executemany('''
             REPLACE INTO technical_indicators 
-            (symbol, stock_name, date, rsi14, ma10, daily_change_pct, trend, upper_band, lower_band, volume, vol_ratio, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (symbol, stock_name, date, rsi14, ma10, daily_change_pct, trend, upper_band, lower_band, volume, vol_ratio, 
+             vol_20d_avg, vol_20d_max, vol_50d_min, is_high_vol_bar, is_sky_vol_bar, is_low_vol_bar, near_20d_high, price_condition, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', data_to_insert)
         
         conn.commit()
