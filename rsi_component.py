@@ -38,40 +38,71 @@ def calculate_rsi(data: pd.DataFrame, period: int = 14) -> pd.Series:
 
 def find_peaks_troughs(series: pd.Series, window: int, min_distance: int) -> Tuple[List[int], List[int]]:
     """
-    改进的峰谷检测算法，更适合中期背离
+    高效的滑动窗口峰谷检测算法
+    
+    算法原理：
+    1. 使用滑动窗口扫描整个序列，每个窗口内直接找最大值/最小值
+    2. 只在窗口中心区域（25%-75%位置）识别峰谷，确保真实性
+    3. 通过步长优化减少重复计算，提高效率
+    4. 验证邻近点关系，过滤平台型假峰值
+    
+    参数说明：
+    - series: 价格序列（收盘价）
+    - window: 观察窗口大小（短期 20，中期 60，长期 90）
+    - min_distance: 峰谷间最小间隔（防止频繁震荡）
+    
+    返回: (peaks_indices, troughs_indices) 峰值和谷值的索引列表
+    
+    优势：
+    - 时间复杂度: O(n×window/step) vs 传统方法 O(n×window)
+    - 避免均值计算的复杂判断，直接基于极值
+    - 自动去重排序，确保结果唯一性
     """
     peaks = []
     troughs = []
+    n = len(series)
     
-    # 使用更灵活的窗口计算
-    look_back = window // 2  # 缩小回看窗口
-    look_forward = window // 3  # 前瞻窗口更小，提高实时性
+    # 步长优化：根据最小距离确定窗口移动步长
+    # step = min_distance // 3 确保信号覆盖完整，避免遗漏
+    step = max(1, min_distance // 3)
     
-    for i in range(look_back, len(series) - look_forward):
-        # 检查最小距离
-        if peaks and i - peaks[-1] < min_distance:
-            continue
-        if troughs and i - troughs[-1] < min_distance:
-            continue
+    for start in range(0, n - window + 1, step):
+        end = start + window
+        window_data = series.iloc[start:end]
         
-        # 获取局部窗口数据
-        window_left = series.iloc[i-look_back:i]
-        window_right = series.iloc[i+1:i+look_forward+1]
-        current = series.iloc[i]
+        # 步骤1: 在当前窗口内找到绝对最大值和最小值
+        local_max_idx = window_data.idxmax()
+        local_min_idx = window_data.idxmin()
         
-        # 峰值条件：比两侧的移动平均都高
-        if (current > window_left.mean() * 1.001 and  # 比左侧均值高 0.1%
-            current > window_right.mean() * 1.001 and  # 比右侧均值高 0.1%
-            current >= series.iloc[i-1] and  # 比前一点高
-            current >= series.iloc[i+1]):    # 比后一点高
-            peaks.append(i)
-            
-        # 谷值条件：比两侧的移动平均都低
-        elif (current < window_left.mean() * 0.999 and  # 比左侧均值低 0.1%
-              current < window_right.mean() * 0.999 and  # 比右侧均值低 0.1%
-              current <= series.iloc[i-1] and  # 比前一点低
-              current <= series.iloc[i+1]):    # 比后一点低
-            troughs.append(i)
+        # 步骤2: 转换为原始序列的全局索引位置
+        global_max_idx = series.index.get_loc(local_max_idx)
+        global_min_idx = series.index.get_loc(local_min_idx)
+        
+        # 步骤3: 定义窗口中心区域（25%-75%），避免边缘效应
+        center_start = start + window // 4
+        center_end = start + 3 * window // 4
+        
+        # 步骤4: 峰值验证与添加
+        if (center_start <= global_max_idx <= center_end and  # 在中心区域
+            (not peaks or global_max_idx - peaks[-1] >= min_distance)):  # 满足最小距离
+            # 邻近点验证：确保是真实峰值而非平台
+            if (global_max_idx > 0 and global_max_idx < n-1 and
+                series.iloc[global_max_idx] >= series.iloc[global_max_idx-1] and
+                series.iloc[global_max_idx] >= series.iloc[global_max_idx+1]):
+                peaks.append(global_max_idx)
+        
+        # 步骤5: 谷值验证与添加
+        if (center_start <= global_min_idx <= center_end and  # 在中心区域
+            (not troughs or global_min_idx - troughs[-1] >= min_distance)):  # 满足最小距离
+            # 邻近点验证：确保是真实谷值而非平台
+            if (global_min_idx > 0 and global_min_idx < n-1 and
+                series.iloc[global_min_idx] <= series.iloc[global_min_idx-1] and
+                series.iloc[global_min_idx] <= series.iloc[global_min_idx+1]):
+                troughs.append(global_min_idx)
+    
+    # 步骤6: 后处理 - 去重并排序，确保结果唯一性和时间顺序
+    peaks = sorted(list(set(peaks)))
+    troughs = sorted(list(set(troughs)))
     
     return peaks, troughs
 
@@ -99,12 +130,15 @@ def is_valid_divergence(
     if divergence_type == 'bearish':
         # 顶背离条件
         price_condition = current_price > prev_price * 1.001  # 价格上涨超过 0.1%
-        rsi_condition = current_rsi < prev_rsi * 0.99        # RSI 下降超过 1%
-        rsi_range = 50 <= max(current_rsi, prev_rsi) <= 90   # RSI 区间
+        rsi_condition = current_rsi < prev_rsi * 0.995       # RSI 下降超过 0.5%，更灵敏
+        rsi_range = 55 <= max(current_rsi, prev_rsi) <= 90   # 要求至少有一个峰值的 RSI 在 55-90 区间内，允许极端超买
         
-        # 关键约束：统一使用严格标准，RSI 必须进入深度超买区域（80以上）
-        # 这样可以有效屏蔽短期假信号，确保调整充分
-        rsi_overbought_crossed = interval_rsi.max() >= 80  # 统一要求触及深度超买线
+        # 关键约束：根据时间框架调整超买阈值
+        # 短期更宽松，中长期更严格
+        if timeframe == 'short':
+            rsi_overbought_crossed = interval_rsi.max() >= 60  # 短期宽松阈值
+        else:
+            rsi_overbought_crossed = interval_rsi.max() >= 65  # 中长期严格阈值
         
         # 中期背离特殊处理
         if timeframe == 'medium':
@@ -121,14 +155,14 @@ def is_valid_divergence(
         # 底背离条件
         price_condition = current_price < prev_price * 0.999  # 价格下跌超过 0.1%
         rsi_condition = current_rsi > prev_rsi * 1.01        # RSI 上升超过 1%
-        rsi_range = 10 <= min(current_rsi, prev_rsi) <= 50   # RSI 区间
+        rsi_range = 15 <= min(current_rsi, prev_rsi) <= 45   # 要求至少有一个峰值的 RSI 在 15-45 区间内，允许极端超卖
         
         # 底背离严格阈值：确保充分调整
         # 中长期要求深度超卖，短期相对宽松
         if timeframe == 'medium' or timeframe == 'long':
-            rsi_oversold_crossed = interval_rsi.min() <= 20   # 中长期要求深度超卖
+            rsi_oversold_crossed = interval_rsi.min() <= 30   # RSI14 标准超卖线
         else:  # short term
-            rsi_oversold_crossed = interval_rsi.min() <= 30   # 短期适中阈值
+            rsi_oversold_crossed = interval_rsi.min() <= 35   # 短期相对宽松阈值
         
         # 中期背离特殊处理
         if timeframe == 'medium':
@@ -185,7 +219,7 @@ def calculate_rsi_divergence_confidence(
 
 def detect_rsi_divergence(price_data: pd.DataFrame, rsi: pd.Series) -> pd.DataFrame:
     """
-    优化的背离检测算法
+    优化的背离检测算法，置信度 35 (%)
     """
     divergences = []
     
@@ -236,7 +270,7 @@ def detect_rsi_divergence(price_data: pd.DataFrame, rsi: pd.Series) -> pd.DataFr
                     timeframe=timeframe
                 )
                 
-                if confidence >= 30:
+                if confidence >= 35:
                     divergences.append({
                         'date': price_data['日期'].iloc[current_idx],
                         'prev_date': price_data['日期'].iloc[prev_idx],
@@ -286,7 +320,7 @@ def detect_rsi_divergence(price_data: pd.DataFrame, rsi: pd.Series) -> pd.DataFr
                     timeframe=timeframe
                 )
                 
-                if confidence >= 30:
+                if confidence >= 35:
                     divergences.append({
                         'date': price_data['日期'].iloc[current_idx],
                         'prev_date': price_data['日期'].iloc[prev_idx],

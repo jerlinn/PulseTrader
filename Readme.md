@@ -423,6 +423,7 @@ PulseTrader/
 - [x] All-in-one 脚本
 - [x] H 股支持
 - [x] 成交量指标：极致缩量、放量、爆量识别与可视化
+- [x] 优化相对强度阈值、峰值算法和置信度阈值（详见 rsi_component.py 代码注释）
 - [ ] Deepseek 支持？
 - [ ] 美股支持
 
