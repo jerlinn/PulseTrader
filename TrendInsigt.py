@@ -86,6 +86,10 @@ def analyze_stock(stock_name, period='1年'):
         print(f"⚠️ 查询股票名称时出错: {e}")
         actual_stock_name = stock_name  # fallback 到用户输入的名称
 
+    # 为图表标题添加市场标识
+    market_suffix = "(H)" if market_type == "hk" else "(A)"
+    display_stock_name = f"{actual_stock_name}{market_suffix}"
+
     # 计算并存储技术指标
     enhanced_result = enhance_analysis_with_indicators(df, actual_stock_name, symbol)
     
@@ -117,7 +121,7 @@ def analyze_stock(stock_name, period='1年'):
     else:
         divergences = pd.DataFrame()
 
-    fig = create_stock_chart(enhanced_df, actual_stock_name, divergences, today)
+    fig = create_stock_chart(enhanced_df, display_stock_name, divergences, today)
     fig.show()
     
     # 打印技术指标摘要
