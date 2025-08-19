@@ -62,15 +62,28 @@ def analyze_stock(stock_name, period='1年'):
         import sqlite3
         conn = sqlite3.connect('cache/stock_data.db')
         cursor = conn.cursor()
-        cursor.execute('SELECT DISTINCT stock_name FROM stock_data WHERE symbol = ? AND stock_name != ? LIMIT 1', (symbol, symbol))
-        result = cursor.fetchone()
-        conn.close()
         
-        if result and result[0]:
-            actual_stock_name = result[0]
+        # 优先从完整的 stock_info 表中获取真实名称
+        cursor.execute('SELECT name FROM stock_info WHERE code = ? LIMIT 1', (symbol,))
+        info_result = cursor.fetchone()
+        
+        if info_result and info_result[0] and info_result[0] != symbol:
+            actual_stock_name = info_result[0]
+            print(f"📋 从信息表获取真实名称: {symbol} → {actual_stock_name}")
         else:
-            actual_stock_name = stock_name  # fallback 到用户输入的名称
+            # 如果 stock_info 表中没有找到，尝试从 stock_data 表中获取
+            cursor.execute('SELECT DISTINCT stock_name FROM stock_data WHERE symbol = ? AND stock_name != ? LIMIT 1', (symbol, symbol))
+            result = cursor.fetchone()
+            
+            if result and result[0]:
+                actual_stock_name = result[0]
+                print(f"📋 从数据表获取股票名称: {symbol} → {actual_stock_name}")
+            else:
+                actual_stock_name = stock_name  # fallback 到用户输入的名称
+        
+        conn.close()
     except Exception as e:
+        print(f"⚠️ 查询股票名称时出错: {e}")
         actual_stock_name = stock_name  # fallback 到用户输入的名称
 
     # 计算并存储技术指标
