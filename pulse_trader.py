@@ -65,10 +65,15 @@ class PulseTraderIntegrated:
             result = trend_analyze_stock(stock_name)
             
             if result is not None:
-                # 构建图表路径（基于 TrendInsigt 的命名规则）
-                today = datetime.today().strftime('%Y%m%d')
-                chart_filename = f"{stock_name}_PulseTrader_{today}.png"
-                chart_path = os.path.join("figures", chart_filename)
+                # 处理返回值（新版本返回 tuple，包含图表路径）
+                if isinstance(result, tuple):
+                    fig, chart_path = result
+                else:
+                    # 兼容旧版本（仅返回 fig 的情况）
+                    fig = result
+                    today = datetime.today().strftime('%Y%m%d')
+                    chart_filename = f"{stock_name}_PulseTrader_{today}.png"
+                    chart_path = os.path.join("figures", chart_filename)
                 
                 if os.path.exists(chart_path):
                     print(f"✅ 技术分析完成")
@@ -76,7 +81,7 @@ class PulseTraderIntegrated:
                     return {
                         'stock_name': stock_name,
                         'chart_path': chart_path,
-                        'figure': result,
+                        'figure': fig if isinstance(result, tuple) else result,
                         'success': True
                     }
                 else:

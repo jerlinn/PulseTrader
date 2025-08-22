@@ -121,7 +121,7 @@ def analyze_stock(stock_name, period='1年'):
     else:
         divergences = pd.DataFrame()
 
-    fig = create_stock_chart(enhanced_df, display_stock_name, divergences, today)
+    fig, chart_path = create_stock_chart(enhanced_df, display_stock_name, divergences, today)
     fig.show()
     
     # 打印技术指标摘要
@@ -162,7 +162,7 @@ def analyze_stock(stock_name, period='1年'):
         if latest_signal_text:
             print(f"最新信号：{latest_signal_text}")
     
-    return fig
+    return fig, chart_path
 
 def initialize_system():
     """初始化系统，预加载必要信息"""
@@ -211,7 +211,12 @@ def main():
             result = analyze_stock(stock_name)
             
             if result is not None:
-                print(f"✅ {stock_name} 分析完成!")
+                # 处理返回值（可能是 tuple 或 fig）
+                if isinstance(result, tuple):
+                    fig, chart_path = result
+                    print(f"✅ {stock_name} 分析完成!")
+                else:
+                    print(f"✅ {stock_name} 分析完成!")
                 
                 # 询问是否继续
                 continue_choice = input("\n是否分析其他股票? (y/n): ").strip().lower()

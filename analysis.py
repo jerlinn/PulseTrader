@@ -243,6 +243,10 @@ def get_technical_indicators_context(chart_image_path):
     if not stock_name:
         return ""
     
+    # 去除市场标识符 (H) 或 (A)
+    import re
+    stock_name = re.sub(r'\([HA]\)$', '', stock_name)
+    
     # 获取股票代码（支持多市场搜索）
     try:
         from stock_data_provider import create_data_provider

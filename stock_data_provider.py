@@ -320,7 +320,7 @@ class StockDataProvider:
                 return xd_matches.iloc[0]['code']
         
         # 尝试部分匹配
-        partial_matches = stock_info[stock_info['name'].str.contains(stock_name, na=False)]
+        partial_matches = stock_info[stock_info['name'].str.contains(stock_name, na=False, regex=False)]
         if not partial_matches.empty:
             print(f"部分匹配找到 {len(partial_matches)} 个结果，使用第一个: {partial_matches.iloc[0]['name']}")
             return partial_matches.iloc[0]['code']

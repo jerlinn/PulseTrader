@@ -59,7 +59,8 @@ def create_stock_chart(df, stock_name, divergences, today):
     
     print(f"图表已保存至: {fig_name}")
     print(f"HTML 版本已保存至: {html_name}")
-    return fig
+    
+    return fig, fig_name
 
 def _add_ma10_line(fig, df):
     """添加 MA10"""

@@ -1,4 +1,4 @@
-![og-image](https://raw.githubusercontent.com/jerlinn/PulseTrader/main/assets/og-image.webp)
+![og-image](https://raw.githubusercontent.com/jerlinn/PulseTrader/main/assets/report.png)
 
 ## PulseTrader - 探讨 AI 量化投资的正确方向
 
