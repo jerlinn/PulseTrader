@@ -65,7 +65,7 @@ python pulse_trader.py --stock "股票名称" --no-ai
 
 ### 分析杭钢股份（完整流程）
 ```bash
-python pulse_trader.py --stock "杭钢股份"
+python pulse_trader.py --stock "甘肃能源"
 ```
 
 ### 快速技术分析东方电气

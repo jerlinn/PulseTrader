@@ -159,4 +159,4 @@ storage = IndicatorsStorage()
 summary = storage.get_latest_indicators(stock_name)
 ```
 
-通过这个优化后的系统，所有数据都在统一的SQLite数据库中，避免了存储重叠，提供了更好的性能和数据管理能力。
+通过这个优化后的系统，所有数据都在统一的 SQLite 数据库中，避免了存储重叠，提供了更好的性能和数据管理能力。

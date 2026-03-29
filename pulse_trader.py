@@ -36,7 +36,7 @@ class PulseTraderIntegrated:
     
     def get_stock_input(self) -> str:
         """获取用户输入的股票名称"""
-        default_stock = "杭钢股份"
+        default_stock = "甘肃能源"
         
         try:
             user_input = input(f"请输入股票名称 (回车默认'{default_stock}', 按 'q' 退出): ").strip()
@@ -102,7 +102,7 @@ class PulseTraderIntegrated:
         
         try:
             choice = input("请选择 (y/n): ").strip().lower()
-            if choice in ['y', 'yes', '是', 'Y']:
+            if choice in ['', 'y']:
                 # 获取额外的分析上下文
                 print(f"\n💡 提供额外的信息")
                 context = input("请输入（可选，回车跳过补充）: ").strip()

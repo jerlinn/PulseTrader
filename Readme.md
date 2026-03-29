@@ -1,4 +1,4 @@
-![og-image](https://raw.githubusercontent.com/jerlinn/PulseTrader/main/assets/report.png)
+![og-image](https://raw.githubusercontent.com/jerlinn/PulseTrader/main/assets/cover.jpg)
 
 ## PulseTrader - 探讨 AI 量化投资的正确方向
 
@@ -242,6 +242,7 @@ graph LR
 
 https://github.com/user-attachments/assets/b372a5bf-a92b-4aa5-9616-d9209abe3917
 
+
 ### 成交量指标系统
 
 **三大成交量信号识别**：
@@ -424,7 +425,7 @@ PulseTrader/
 - [x] H 股支持
 - [x] 成交量指标：极致缩量、放量、爆量识别与可视化
 - [x] 优化相对强度阈值、峰值算法和置信度阈值（详见 rsi_component.py 代码注释）
-- [ ] Deepseek 支持？
+- [x] Claude 支持
 - [ ] 美股支持
 
 ## 🤝 贡献指南

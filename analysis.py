@@ -18,6 +18,7 @@ from indicators_storage import IndicatorsStorage
 """
 
 # ========== Configuration ==========
+MODEL = "claude-sonnet-4-6"  # claude-sonnet-4-6, gpt-5.4
 CHART_IMAGE_PATH = 'figures/腾讯控股_PulseTrader_20250818.png'
 SHOW_REASONING_IN_TERMINAL = True  # False 可隐藏推理过程
 USE_COLORED_OUTPUT = True  # False 可禁用彩色输出
@@ -205,19 +206,15 @@ def save_analysis_report(extracted_content, stock_symbol=None, chart_image_path=
         # 使用相对路径，从 reports 目录指向 figures 目录
         relative_image_path = f"../{chart_image_path}"
         chart_section = f"""
-## 走势脉络图
-
 ![{stock_symbol or "股票"}走势图]({relative_image_path})
 
 """
     
-    md_content = f"""# 📊 交易诊断书 · {stock_symbol or "未指定"}
+    md_content = f"""# 📊 交易手记 · {stock_symbol or "未指定"}
 
-**生成时间**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}  
+**Date**: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}  
 
 {chart_section}
-## 策略研判
-
 {formatted_content}
 
 ---
@@ -422,7 +419,8 @@ def process_response_stream(response):
                         if not text_output_started:
                             text_output_started = True
                             print(f"\n\n{Colors.BOLD}📋 [Analysis]{Colors.ENDC}")
-                        print(f"{Colors.GREEN}{parsed['content']}{Colors.ENDC}", end='', flush=True)
+                        text = parsed['content'].replace('\\n', '\n')
+                        print(f"{Colors.GREEN}{text}{Colors.ENDC}", end='', flush=True)
                     elif parsed['type'] in ['reasoning', 'reasoning_summary'] and SHOW_REASONING_IN_TERMINAL:
                         reasoning_event_count += 1
                         # 调试：显示推理事件统计
@@ -480,9 +478,42 @@ def process_response_stream(response):
 def finish_reasoning_display():
     """简化的推理显示结束"""
     global reasoning_display_buffer, reasoning_started
-    
+
     reasoning_display_buffer = ""
     reasoning_started = False
+
+def is_claude_model(model):
+    return model.startswith("claude")
+
+def process_chat_stream(response):
+    """处理 chat completions 流式响应（Claude 模型）"""
+    print(f"{Colors.BOLD}🤖 AI 分析中...{Colors.ENDC}")
+
+    content_parts = []
+    started = False
+
+    try:
+        for chunk in response:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if delta.content:
+                if not started:
+                    started = True
+                    print(f"\n\n{Colors.BOLD}📋 [Analysis]{Colors.ENDC}")
+                content_parts.append(delta.content)
+                print(f"{Colors.GREEN}{delta.content}{Colors.ENDC}", end='', flush=True)
+            if chunk.choices[0].finish_reason == 'stop':
+                break
+    except Exception as e:
+        error_msg = str(e)
+        if any(kw in error_msg.lower() for kw in ['connection', 'timeout', 'incomplete']):
+            print(f"\n{Colors.YELLOW}⚠️ 网络连接中断，但已接收到部分响应{Colors.ENDC}")
+        else:
+            print(f"\n{Colors.RED}❌ 流处理错误: {error_msg}{Colors.ENDC}")
+
+    print(f"\n{Colors.GREEN}[Done]{Colors.ENDC}")
+    return {'content': ''.join(content_parts), 'reasoning': ''}
 
 def get_user_context_input():
     """获取用户输入的分析上下文"""
@@ -501,71 +532,71 @@ def run_analysis(chart_image_path=None, user_context=None):
     """运行股票分析，支持可选的用户上下文输入"""
     if chart_image_path is None:
         chart_image_path = CHART_IMAGE_PATH
-    
-    # 技术指标上下文获取
+
     technical_context = get_technical_indicators_context(chart_image_path)
-    
-    # 构建用户消息
+
     if user_context and user_context.strip():
         user_message = f"{technical_context}用户补充信息：{user_context.strip()}\n\n分析当前的股票走势，提供投资建议"
     else:
         user_message = f"{technical_context}分析当前的股票走势，提供投资建议"
-    
-    response = client.responses.create(
-        model="gpt-5", # gpt-5, gpt-5-chat-latest, gpt-5-mini, gpt-5-nano
-        tools=[
-            {
-                "type": "code_interpreter",
-                "container": {"type": "auto"}
-            }
-        ],
-        input=[
-            {
-                "role": "system",
-                "content": [
-                    { "type": "input_text", "text": load_system_prompt() }
-                ]
-            },
-            {
-                "role": "user",
-                "content": [
-                    { "type": "input_text", "text": user_message },
-                    {
-                        "type": "input_image",
-                        "image_url": f"data:image/png;base64,{encode_image(chart_image_path)}",
-                        "detail": "low"
-                    }
-                ]
-            }
-        ],
-        reasoning={ "effort": "medium", "summary": "auto" }, # "low", "medium"(default), "high"
-        text={"verbosity": "low"}, # "low", "medium"(default), "high"，维持用 low 测试
-        stream=True
-    )
-    
-    # 使用强化错误处理的流处理函数
+
+    system_prompt = load_system_prompt()
+    base64_image = encode_image(chart_image_path)
+
     try:
-        response_events = process_response_stream(response)
-        
-        extracted_content = extract_content_from_response(response_events)
-        
-        # 检查是否有有效内容
-        if not extracted_content.get('content') and not response_events:
+        if is_claude_model(MODEL):
+            response = client.chat.completions.create(
+                model=MODEL,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": [
+                        {"type": "text", "text": user_message},
+                        {"type": "image_url", "image_url": {
+                            "url": f"data:image/png;base64,{base64_image}",
+                            "detail": "low"
+                        }}
+                    ]}
+                ],
+                max_tokens=4096,
+                stream=True
+            )
+            extracted_content = process_chat_stream(response)
+        else:
+            response = client.responses.create(
+                model=MODEL,  # gpt-5.4, gpt-5.3-chat-latest
+                tools=[{"type": "code_interpreter", "container": {"type": "auto"}}],
+                input=[
+                    {"role": "system", "content": [
+                        {"type": "input_text", "text": system_prompt}
+                    ]},
+                    {"role": "user", "content": [
+                        {"type": "input_text", "text": user_message},
+                        {"type": "input_image",
+                         "image_url": f"data:image/png;base64,{base64_image}",
+                         "detail": "low"}
+                    ]}
+                ],
+                reasoning={"effort": "medium", "summary": "auto"},
+                text={"verbosity": "low"},
+                stream=True
+            )
+            response_events = process_response_stream(response)
+            extracted_content = extract_content_from_response(response_events)
+
+        if not extracted_content.get('content'):
             print(f"{Colors.YELLOW}⚠️ 未能获取有效的分析内容，可能由于网络中断{Colors.ENDC}")
             return None, chart_image_path
-        
-        # 从图表路径提取股票名称并保存报告
+
         stock_symbol = extract_stock_symbol_from_path(chart_image_path)
         report_path = save_analysis_report(
-            extracted_content, 
-            stock_symbol=stock_symbol, 
+            extracted_content,
+            stock_symbol=stock_symbol,
             chart_image_path=chart_image_path
         )
-        
+
         print(f"\n{Colors.GREEN}🎉 {stock_symbol} 分析完成，报告已保存: {Colors.BLUE}{os.path.basename(report_path)}{Colors.ENDC}")
-        
-        return response, chart_image_path
-        
+        return extracted_content, chart_image_path
+
     except Exception as e:
         print(f"\n{Colors.RED}❌ 分析过程中发生严重错误: {e}{Colors.ENDC}")
         print(f"{Colors.YELLOW}💡 建议检查网络连接后重试{Colors.ENDC}")
